@@ -67,3 +67,38 @@ from its children objects so those can be deleted too.
 Also the owner needs to set an OwnerReference to the child object it creates
 so when the owner is deleted k8s can do a cascade delete tor remove the child
 object automatically.
+
+## Patching vs Updating CR Status
+Our CRDs have `Spec` and `Status` subresources. The `Spec` represents the
+input to the reconciler. The reconciler treats it as a read-only struct. On
+the other hand, the reconciler actively updates the `Status` subresource to
+provide information to the outside world. The `Status` is treated as
+read-only outside of the reconciler. K8s uses the generation concept to ensure
+that parallel writes to the same resource result in a consistent state.
+However, generation only exists on the CRD level and not on the subresource
+level. So while the usage of `Spec` and `Status` makes these two subresources
+independent and race-free, an external update to `Spec` can "race" with an
+internal update to `Status` on the generation on the CRD level. This means the
+controller can get a `Conflict` response from k8s when trying to update the
+`Status` of the CR. In our current operator implementations, such conflict
+causes a new reconciliation to start with a fresh copy of the CR. To minimize
+such re-reconciliation attempts the controller should only update the `Status`
+subresource if some status data is changed. The `Helper` in `lib-common`
+tracks the changes on the CR instance and can tell if something is changed. It
+also makes it possible to use `Patch()` over `Update()` to limit the amount of
+data sent to the API server.
+
+The basic usage pattern of the Helper is the following:
+
+1. At the start of the `Reconcile()` call query the state of the CR from the
+k8s and instantiate a new `Helper` with it. The `Helper` will copy the actual
+state of the CR internally.
+
+2. Modify the CR instance during the `Reconcile()` call
+
+3. At the end of the `Reconcile()` use `Helper.SetAfter()` to provide the new
+state of the CR to the helper. Then use `Helper.GetChanges()` to see if there
+was any changes and if so you can use the controller-runtime's
+`Client.MergeFrom(Helper.GetBeforeObject())` to generate the patch request that
+can be used in the `Reconciler.Status().Patch()` to do the minimal update the
+`Status` subresource.
