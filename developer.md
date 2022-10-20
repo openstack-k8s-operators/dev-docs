@@ -102,3 +102,23 @@ was any changes and if so you can use the controller-runtime's
 `Client.MergeFrom(Helper.GetBeforeObject())` to generate the patch request that
 can be used in the `Reconciler.Status().Patch()` to do the minimal update the
 `Status` subresource.
+
+### Always return after update
+For safety we should return from the reconciler after doing an update on the
+instance. If we don't the we can get read-after-write consistency errors in the
+reconciler.
+
+The reason is that the reconciler is called with an object from a shared
+informer. This has a watch and a cache. As soon as you call Update() or Patch()
+the watch is going to update the shared informer, and the reconciler is queued
+to be called again with the state of the object at this point. i.e. Without any
+of the things the reconciler would change on the instance after this update.
+When the reconcile function returns we call our defer func, which updates the
+object again. At this point there is a race. The shared informer already has a
+previous reconcile queued for us. If we get called again before kube-apiserver
+has fired the watch from the second update and the informer has updated based
+on it, we will be called with old data. i.e. We write new data and then
+immediately get called again with a version of the object which doesn't contain
+the changes we just wrote. Worse, this is extremely likely to happen in
+practise. Given that we're going to be called again anyway once we call update
+we might  as well exit after a single update call and wait.
