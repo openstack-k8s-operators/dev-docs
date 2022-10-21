@@ -122,3 +122,12 @@ immediately get called again with a version of the object which doesn't contain
 the changes we just wrote. Worse, this is extremely likely to happen in
 practise. Given that we're going to be called again anyway once we call update
 we might  as well exit after a single update call and wait.
+## Self finalizer
+There are two reasons to add a finalizer to a CR instance from its reconciler:
+
+1. If the reconciler creates children CR instances with finalizers. See
+[#2. in child objects](#Child-objects)
+
+2. If the instance needs specific cleanup actions. For example running a `Job`
+when the instance is being deleted. Note that deleting children CRs are
+automatic if `OwnerReferece` is set no explict delete is needed there.
