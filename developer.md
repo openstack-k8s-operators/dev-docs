@@ -131,3 +131,38 @@ There are two reasons to add a finalizer to a CR instance from its reconciler:
 2. If the instance needs specific cleanup actions. For example running a `Job`
 when the instance is being deleted. Note that deleting children CRs are
 automatic if `OwnerReferece` is set no explict delete is needed there.
+
+## Defaulting structs
+When a CRD has an optional struct field the defaulting of that field needs
+special care. Both the field with the struct type need a full default value
+defined and each individual subfields in the struct needs default value
+defined.
+
+Our common example is the `PasswordSelectors` struct.
+
+```golang
+type PlacementAPISpec struct {
+	//...
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default={database: PlacementDatabasePassword, service: PlacementPassword}
+	// PasswordSelectors - Selectors to identify the DB and ServiceUser password from the Secret
+	PasswordSelectors PasswordSelector `json:"passwordSelectors,omitempty"`
+	//...
+}
+
+type PasswordSelector struct {
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default=PlacementDatabasePassword
+	// Database - Selector to get the Database user password from the Secret
+	Database string `json:"database"`
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default=PlacementPassword
+	// Service - Selector to get the service user password from the Secret
+	Service string `json:"service"`
+}
+```
+When `passwordSelectors` is not provided in the input then the default defined
+for the `PasswordSelectors` field will be used. But when the
+`passwordSelectors` field is in the input but only defines the `database` field
+but not the `service` then the default defiened at `Service` field will be
+used.
