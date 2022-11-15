@@ -275,6 +275,17 @@ mkdir -p pkg/placement
 
 See https://sdk.operatorframework.io/docs/building-operators/golang/tutorial/ for a tutorial, or take the keystone-operator as a reference.
 
+## Make `api` a separate go module
+- Add a `go.mod` file to the `./api` directory to make it a separate go module.
+- Add a
+  ```
+  replace github.com/openstack-k8s-operators/<your operator>/api => ./api
+  ```
+  line to the main `go.mod` file.
+
+This way other operators creating CRs of this operator only need to depend
+on a small subset of the operator implementation.
+
 ## Test the operator
 ### Run the operator local without need to buld image
 A pre req is that the CRDs, RBAC resources got all created in the cluster.
