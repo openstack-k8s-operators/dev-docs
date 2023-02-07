@@ -5,3 +5,4 @@ Documentation related to podified controlplane.
 * [Conditions usage](conditions.md)
 * [Common issues](common_issues.md)
 * [Implementation Guidelines](developer.md)
+* [Quickstart on writing KUTTL tests for an operator](kuttl_tests.md)
