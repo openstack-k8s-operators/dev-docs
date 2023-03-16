@@ -6,3 +6,4 @@ Documentation related to podified controlplane.
 * [Common issues](common_issues.md)
 * [Implementation Guidelines](developer.md)
 * [Quickstart on writing KUTTL tests for an operator](kuttl_tests.md)
+* [Building operator images](image_build.md)
