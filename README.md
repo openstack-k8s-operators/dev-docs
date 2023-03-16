@@ -7,3 +7,4 @@ Documentation related to podified controlplane.
 * [Implementation Guidelines](developer.md)
 * [Quickstart on writing KUTTL tests for an operator](kuttl_tests.md)
 * [Building operator images](image_build.md)
+* [Debugging operator via vscode](debugging.md)
