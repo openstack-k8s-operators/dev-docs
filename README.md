@@ -9,3 +9,4 @@ Documentation related to podified controlplane.
 * [Building operator images](image_build.md)
 * [Debugging operator via vscode](debugging.md)
 * [Running a local copy of an operator for development without conflicts](running_local_operator.md)
+* [Webhooks usage](webhooks.md)
