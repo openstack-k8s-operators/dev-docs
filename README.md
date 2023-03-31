@@ -10,3 +10,4 @@ Documentation related to podified controlplane.
 * [Debugging operator via vscode](debugging.md)
 * [Running a local copy of an operator for development without conflicts](running_local_operator.md)
 * [Webhooks usage](webhooks.md)
+* [Networking](networking.md)
