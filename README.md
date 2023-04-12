@@ -11,3 +11,4 @@ Documentation related to podified controlplane.
 * [Running a local copy of an operator for development without conflicts](running_local_operator.md)
 * [Webhooks usage](webhooks.md)
 * [Networking](networking.md)
+* [Operator controller manager pod labels](operator_controller_labels.md)
