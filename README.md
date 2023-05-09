@@ -12,3 +12,4 @@ Documentation related to podified controlplane.
 * [Webhooks usage](webhooks.md)
 * [Networking](networking.md)
 * [Operator controller manager pod labels](operator_controller_labels.md)
+* [Testing operators with EnvTest](envtest.md)
