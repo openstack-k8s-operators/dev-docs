@@ -208,7 +208,7 @@ There is a set of common test functionality that lives in the
 [`test`](https://github.com/openstack-k8s-operators/lib-common/tree/master/modules/test)
 and
 [`test-operators`](https://github.com/openstack-k8s-operators/lib-common/tree/master/modules/test-operators)
-modules of lib-common. These modules contains:
+modules of lib-common. Docs are [here](https://pkg.go.dev/github.com/openstack-k8s-operators/lib-common/modules/test@v0.0.0-20230510145530-3c8e9179fb6e/helpers). These modules contains:
 * Generic asserts functions like `ExpectCondition` that checks the status
   conditions of any openstack CRD
 * Helpers for simulating external events like `SimulateJobSuccess` and
@@ -279,6 +279,22 @@ add a prow job to run that make target for every PR. See for the
 
 ## Best practices
 
+**Tips and tricks for improving Ginkgo tests**
+
+Tips and tricks for improving the efficiency and organization of your Ginkgo tests:
+
+1. To avoid duplicating general test setup code, utilize Ginkgo's global `BeforeEach` and `AfterEach` functions. These should be placed in the [top-level suite](https://github.com/openstack-k8s-operators/nova-operator/blob/main/test/functional/suite_test.go#L237) to ensure consistent setup and teardown across all tests. This BeforeEach can be combined with [`BeforeEach`](https://github.com/openstack-k8s-operators/nova-operator/blob/main/test/functional/nova_multicell_test.go#L100) in any test lvl. More `BeforeEach` and `Context` [here](https://onsi.github.io/ginkgo/#shared-behaviors)
+
+2. When using envtest, create a unique namespace for each test run. This is necessary because namespaces cannot be deleted in a locally running envtest. For more information, refer to the [Kubebuilder documentation](https://book.kubebuilder.io/reference/envtest.html#namespace-usage-limitation) on namespace usage limitation.
+
+3. Use Ginkgo's table. Entry functionality to reduce the number of individual tests. By consolidating multiple test cases into a table, you can streamline your test suite and improve readability. Remember that if you want to use anything that is initialized in in `BeforeEach` ginkgo doesn’t know about it during [Spec traversing](https://github.com/onsi/ginkgo/issues/378). This augmenting issue can be avoided by similar patterns like [here](https://github.com/openstack-k8s-operators/nova-operator/blob/e07bd0cfbd9df09a208b64a97a943b752f416b1e/test/functional/nova_reconfiguration_test.go#L367). 
+
+4. Please avoid using hardcoded paths; instead, try adopting a similar approach as demonstrated in this [example](https://github.com/openstack-k8s-operators/nova-operator/commit/3ab489b1f59f7bf9fe6efdc72fbe058c65732318).
+
+5. To divide tests into smaller, more logical components, you can utilize `By`  [statements](https://onsi.github.io/ginkgo/#documenting-complex-specs-by).
+
+6. To divide tests into more logical segments and conveniently run only a portion of them, you can utilize [labels](https://onsi.github.io/ginkgo/#spec-labels).
+
 ### operator-lint
 The [operator-lint](https://github.com/gibizer/operator-lint) static checker
 enforces some EnvTest related
@@ -289,5 +305,5 @@ So run operator-lint on your project to catch common mistakes.
 * [Kubebuilder envtest doc](https://book.kubebuilder.io/reference/envtest.html)
 * [Kubebuilder envtest example](https://book.kubebuilder.io/cronjob-tutorial/writing-tests.html)
 * [Gomega (the assert library)](https://github.com/onsi/gomega)
-* [Ginkgo (the BDD test framework](https://github.com/onsi/ginkgo)
+* [Ginkgo (the BDD test framework)](https://github.com/onsi/ginkgo)
 * [The nova-operator as the example test suite](https://github.com/openstack-k8s-operators/nova-operator/tree/master/test/functional)
