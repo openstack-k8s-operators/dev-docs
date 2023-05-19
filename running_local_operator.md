@@ -16,15 +16,21 @@ will resolve its CR.
 
 ## Removing a service from the CSV
 
-Query the CSV to identify the index of the service you want to scale down.
+Define an operator name and query the CSV to identify the index of the service you want to scale down  
+
 ```
-oc get csv openstack-operator.v0.0.1 -o json \
-  | jq -r '.spec.install.spec.deployments[].name'
+export OPERATOR_NAME="openstack-ansiblee-operator"
+OPERATOR_INDEX=(oc get csv openstack-operator.v0.0.1 -o json | jq -r '.spec.install.spec.deployments | map(.name == $ENV.OPERATOR_NAME + "-controller-manager") | index(true)'
 ```
 Update the CSV
 ```
 oc patch csv openstack-baremetal-operator.v0.0.1 --type json \
-  -p='[{"op": "remove", "path": "/spec/install/spec/deployments/<index>"}]'
+  -p="[{"op": "remove", "path": "/spec/install/spec/deployments/${OPERATOR_INDEX}"}]"
+```
+
+Unset variables
+```
+unset OPERATOR_NAME OPERATOR_INDEX
 ```
 
 ## Explanation Provided by ChatGPT
