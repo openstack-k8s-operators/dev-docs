@@ -448,7 +448,62 @@ Examples on how to use the `OpenStackControlPlane` CRD can be found at
 * https://github.com/openstack-k8s-operators/openstack-operator/blob/master/config/samples/core_v1beta1_openstackcontrolplane_network_isolation_ceph.yaml
 
 ## DNS
-TBD
+The the infra-operator privides CRDs to setup and manage a dnsmasq instances for DNS.
+
+The `DNSMasq` CRD allows creating a dnsmasq DNS server instance and expose the service via `ExternalEndpoints` as with the API endpoints via MetalLB to systems on isolated networks.
+
+Using `Spec.Options` the instance can be customized from the default config started. E.g. adding a DNS server to forward requests to which are not resolvable vie the local instances can be done like:
+
+```yaml
+spec:
+...
+  options:
+  - key: server
+    values:
+    - 192.168.122.1
+```
+
+Information about hosts to resolve is being added via configmaps which have a label with `dnsmasqhosts: dnsdata` (can be customized via `DNSDataLabelSelectorValue`) set.
+
+The `DNSData` CRD allows to register hosts, which should be resolved in the dnsmasq instance. The CRD creates the required configmap with the label as
+described above.
+
+```yaml
+apiVersion: network.openstack.org/v1beta1
+kind: DNSData
+metadata:
+  name: somehosts
+  namespace: openstack
+spec:
+  dnsDataLabelSelectorValue: dnsdata
+  hosts:
+  - hostnames:
+    - edpm-compute-0.ctlplane
+    ip: 192.168.122.100
+  - hostnames:
+    - edpm-compute-0.internalapi
+    ip: 172.17.0.100
+  - hostnames:
+    - edpm-compute-0.storge
+    ip: 172.18.0.100
+  - hostnames:
+    - edpm-compute-0.tenant
+    ip: 172.19.0.100
+  - hostnames:
+    - edpm-compute-1.ctlplane
+    ip: 192.168.122.101
+  - hostnames:
+    - edpm-compute-1.internalapi
+    ip: 172.17.0.101
+  - hostnames:
+    - edpm-compute-1.storge
+    ip: 172.18.0.101
+  - hostnames:
+    - edpm-compute-1.tenant
+    ip: 172.19.0.101
+```
+
+Additionally there is a CRD-less `service_controller`. It watches for `LoadBalancer` services in the same namespace of a `DNSMasq` instance and creates a `DNSData` CR to auto register service endpoints which have an annotation set with  `"dnsmasq.network.openstack.org/hostname": <hostname>`. This annotation gets auto added to the `LoadBalancer` services exposed using lib-common `https://github.com/openstack-k8s-operators/lib-common/pull/258`.
 
 ## IPAM
 TBD
