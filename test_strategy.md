@@ -40,3 +40,13 @@ coverage
 * Each PR changing implementation logic targeting the
 [network](https://github.com/openstack-k8s-operators/infra-operator/tree/main/controllers/network)
 controllers have to include relevant EnvTest coverage.
+
+### lib-common
+* Adding new functionality needs
+  * either EnvTest coverage if the logic is calling k8s APIs. For example
+  [job](https://github.com/openstack-k8s-operators/lib-common/blob/main/modules/common/test/functional/job_test.go)
+  * or unit test coverage if it isn't calling k8s APIs. For example
+  [conditions](https://github.com/openstack-k8s-operators/lib-common/blob/main/modules/common/condition/funcs_test.go)
+
+  Except for the `test` and `test-operators` modules as they are test helpers
+  already.
