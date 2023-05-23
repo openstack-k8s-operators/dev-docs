@@ -17,3 +17,4 @@ Documentation related to podified controlplane.
 * [Strategy to provide files to services](extra_mounts.md)
 * [Ceph](ceph.md)
 * [Hyperconverged Infrastructure](hci.md)
+* [Service config and bootstrap](service_config.md)
