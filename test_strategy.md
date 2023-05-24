@@ -35,3 +35,8 @@ single [pre-commit](https://pre-commit.com/) run both locally and in CI:
 ### nova-operator
 * Each PR changing implementation logic have to include relevant EnvTest
 coverage
+
+### infra-operator
+* Each PR changing implementation logic targeting the
+[network](https://github.com/openstack-k8s-operators/infra-operator/tree/main/controllers/network)
+controllers have to include relevant EnvTest coverage.
