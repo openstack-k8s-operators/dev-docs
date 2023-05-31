@@ -68,8 +68,8 @@ oc patch csv <your operator CSV> --type=json -p="[{'op': 'remove', 'path': '/spe
 **If you were running the operator within the OpenStack operator CSV**
 
 ```bash
-oc get csv -l operators.coreos.com/openstack-operator.openstack -o=jsonpath='{.items[0]}' | jq -r 'del(.spec.webhookdefinitions[] | select(.deploymentName=="<your operator name>-operator-controller-manager"))' > webhook_removal_patch.out
-oc patch csv $(oc get csv -l operators.coreos.com/openstack-operator.openstack -o jsonpath='{.items[0].metadata.name}') --type=merge --patch-file=webhook_removal_patch.out
+oc get csv -n openstack-operators -l operators.coreos.com/openstack-operator.openstack-operators -o=jsonpath='{.items[0]}' | jq -r 'del(.spec.webhookdefinitions[] | select(.deploymentName=="<your operator name>-operator-controller-manager"))' > webhook_removal_patch.out
+oc patch csv -n openstack-operators $(oc get csv -n openstack-operators -l operators.coreos.com/openstack-operator.openstack-operators -o jsonpath='{.items[0].metadata.name}') --type=merge --patch-file=webhook_removal_patch.out
 ```
 
 2. Run the operator locally with the webhook server disabled:
@@ -94,8 +94,8 @@ oc patch csv <your operator CSV> --type=json -p="[{'op': 'remove', 'path': '/spe
 **If you were running the operator within the OpenStack operator CSV**
 
 ```bash
-oc get csv -l operators.coreos.com/openstack-operator.openstack -o=jsonpath='{.items[0]}' | jq -r 'del(.spec.webhookdefinitions[] | select(.deploymentName=="<your operator name>-operator-controller-manager"))' > webhook_removal_patch.out
-oc patch csv $(oc get csv -l operators.coreos.com/openstack-operator.openstack -o jsonpath='{.items[0].metadata.name}') --type=merge --patch-file=webhook_removal_patch.out
+oc get csv -n openstack-operators -l operators.coreos.com/openstack-operator.openstack-operators -o=jsonpath='{.items[0]}' | jq -r 'del(.spec.webhookdefinitions[] | select(.deploymentName=="<your operator name>-operator-controller-manager"))' > webhook_removal_patch.out
+oc patch csv -n openstack-operators $(oc get csv -n openstack-operators -l operators.coreos.com/openstack-operator.openstack-operators -o jsonpath='{.items[0].metadata.name}') --type=merge --patch-file=webhook_removal_patch.out
 ```
 
 2. Now execute the `make` target to run the operator locally with webhooks enabled:
