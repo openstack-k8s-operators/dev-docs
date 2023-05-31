@@ -59,8 +59,17 @@ You can disable the webhooks if you don't need them for your local dev/testing p
 
 1. If you installed the operator via OLM, remove its webhook definitions from its CSV:
 
+**If you were running the operator from its own CSV**
+
 ```bash
 oc patch csv <your operator CSV> --type=json -p="[{'op': 'remove', 'path': '/spec/webhookdefinitions'}]"
+```
+
+**If you were running the operator within the OpenStack operator CSV**
+
+```bash
+oc get csv -l operators.coreos.com/openstack-operator.openstack -o=jsonpath='{.items[0]}' | jq -r 'del(.spec.webhookdefinitions[] | select(.deploymentName=="<your operator name>-operator-controller-manager"))' > webhook_removal_patch.out
+oc patch csv $(oc get csv -l operators.coreos.com/openstack-operator.openstack -o jsonpath='{.items[0].metadata.name}') --type=merge --patch-file=webhook_removal_patch.out
 ```
 
 2. Run the operator locally with the webhook server disabled:
@@ -76,8 +85,17 @@ Webhooks can be used outside of an OLM context if you want or need them.  Howeve
 
 1. First, if you installed the operator via OLM, remove its webhook definitions from its CSV:
 
+**If you were running the operator from its own CSV**
+
 ```bash
 oc patch csv <your operator CSV> --type=json -p="[{'op': 'remove', 'path': '/spec/webhookdefinitions'}]"
+```
+
+**If you were running the operator within the OpenStack operator CSV**
+
+```bash
+oc get csv -l operators.coreos.com/openstack-operator.openstack -o=jsonpath='{.items[0]}' | jq -r 'del(.spec.webhookdefinitions[] | select(.deploymentName=="<your operator name>-operator-controller-manager"))' > webhook_removal_patch.out
+oc patch csv $(oc get csv -l operators.coreos.com/openstack-operator.openstack -o jsonpath='{.items[0].metadata.name}') --type=merge --patch-file=webhook_removal_patch.out
 ```
 
 2. Now execute the `make` target to run the operator locally with webhooks enabled:
