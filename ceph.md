@@ -5,8 +5,8 @@
 This document describes how to use CRs from the
 openstack-k8s-operators project to configure OpenStack
 so that Glance, Cinder, and Nova use block storage
-from an external Ceph cluster. It does not require
-the use of install_yamls.
+and Manila uses file storage from an external Ceph cluster.
+It does not require the use of install_yamls.
 
 ## Prerequisites
 
@@ -23,10 +23,10 @@ Ceph should be accessed via the storage network.
 The storage network is the same as Ceph's public_network. The Glance
 and Cinder pods should be able to access the storage network via
 MetalLB. The Nova compute containers should also be able to access the
-storage network. Glance, Cinder, and Nova will use a ceph.conf file
-containing the IPs of the Ceph monitors; these IPs should be within
-the storage network's IP range.  It is not necessary for OpenStack to
-access Ceph's cluster_network.
+storage network. Glance, Cinder, Nova, and Manila will use a ceph.conf
+file containing the IPs of the Ceph monitors; these IPs should be
+within the storage network's IP range.  It is not necessary for
+OpenStack to access Ceph's cluster_network.
 
 ## Create Ceph Pools for OpenStack
 
@@ -38,6 +38,11 @@ for P in vms volumes images; do
   cephadm shell -- ceph osd pool create $P;
   cephadm shell -- ceph osd pool application enable $P rbd;
 done
+```
+
+If Manila is enabled in the OpenStack controlplane, create the `cephfs` volume.
+```
+cephadm shell -- ceph fs volume create cephfs
 ```
 
 Create a cephx key which OpenStack can use to access the pools.
@@ -111,6 +116,7 @@ spec:
         - propagation:
           - CinderVolume
           - GlanceAPI
+          - ManilaShare
           extraVolType: Ceph
           volumes:
           - name: ceph
@@ -243,6 +249,40 @@ spec:
 The `$FSID` value above should contain the actual FSID as described
 in the "Create a Ceph Secret" section. The FSID itself does not need
 to be considered secret.
+
+## Configure Manila with native CephFS
+
+Use a customServiceConfig to pass overrides to Manila's configuration
+file. For example, the sample
+[core_v1beta1_openstackcontrolplane_network_isolation_ceph.yaml](https://github.com/openstack-k8s-operators/openstack-operator/blob/main/config/samples/core_v1beta1_openstackcontrolplane_network_isolation_ceph.yaml)
+has the following in the OpenStackControlPlane CR:
+
+```
+apiVersion: core.openstack.org/v1beta1
+kind: OpenStackControlPlane
+spec:
+  extraMounts:
+    ...
+    manila:
+        template:
+           manilaShares:
+             share1:
+                customServiceConfig: |
+                    [DEFAULT]
+                    enabled_share_backends=cephfs
+                    enabled_share_protocols=cephfs
+                    [cephfs]
+                    driver_handles_share_servers=False
+                    share_backend_name=cephfs
+                    share_driver=manila.share.drivers.cephfs.driver.CephFSDriver
+                    cephfs_conf_path=/etc/ceph/ceph.conf
+                    cephfs_auth_id=openstack
+                    cephfs_cluster_name=ceph
+                    cephfs_enable_snapshots=True
+                    cephfs_ganesha_server_is_remote=False
+                    cephfs_volume_mode=0755
+                    cephfs_protocol_helper_type=CEPHFS
+```
 
 ## Full Examples
 
