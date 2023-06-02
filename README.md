@@ -15,3 +15,4 @@ Documentation related to podified controlplane.
 * [Testing operators with EnvTest](envtest.md)
 * [Test strategy](test_strategy.md)
 * [Ceph](ceph.md)
+* [Strategy to provide files to services](extra_mounts.md)
