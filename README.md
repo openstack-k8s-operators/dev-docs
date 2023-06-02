@@ -14,3 +14,4 @@ Documentation related to podified controlplane.
 * [Operator controller manager pod labels](operator_controller_labels.md)
 * [Testing operators with EnvTest](envtest.md)
 * [Test strategy](test_strategy.md)
+* [Ceph](ceph.md)
