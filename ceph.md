@@ -96,10 +96,8 @@ the document.
 
 ## Access the Ceph Secret via extraMounts
 
-Use
-[extraMounts](https://github.com/openstack-k8s-operators/lib-common/commit/c3752c8a43423c755adb16aebf644c304befc072)
-in CRs for pods which need to access the Ceph
-secret. For example, the sample
+Use [extraMounts](extra_mounts.md) in CRs for pods which need to
+access the Ceph secret. For example, the sample
 [core_v1beta1_openstackcontrolplane_network_isolation_ceph.yaml](https://github.com/openstack-k8s-operators/openstack-operator/blob/main/config/samples/core_v1beta1_openstackcontrolplane_network_isolation_ceph.yaml)
 has the following in the `OpenStackControlPlane` CR so that the
 Glance and Cinder volume pods mount the cephx key and Ceph
