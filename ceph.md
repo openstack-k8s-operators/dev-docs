@@ -5,12 +5,14 @@
 This document describes how to use CRs from the
 openstack-k8s-operators project to configure OpenStack
 so that Glance, Cinder, and Nova use block storage
-and Manila uses file storage from an external Ceph cluster.
+and Manila uses file storage from a Ceph cluster.
 It does not require the use of install_yamls.
 
 ## Prerequisites
 
-- Access to a Ceph cluster
+- Access to a Ceph cluster. If you intend to host Ceph on EDPM nodes,
+  then follow the [Hyperconverged Infrastructure Documentation](hci.md)
+  first.
 - Access to an OpenShift cluster where the OpenStack operator is
   already running
 - The reader knows how to create CRs from the openstack-k8s-operators
@@ -33,7 +35,7 @@ OpenStack to access Ceph's cluster_network.
 The commands in this section should be run on a Ceph server.
 
 Create pools for Nova (vms), Cinder (volumes) and Glance (images).
-```
+```shell
 for P in vms volumes images; do 
   cephadm shell -- ceph osd pool create $P;
   cephadm shell -- ceph osd pool application enable $P rbd;
@@ -41,12 +43,12 @@ done
 ```
 
 If Manila is enabled in the OpenStack controlplane, create the `cephfs` volume.
-```
+```shell
 cephadm shell -- ceph fs volume create cephfs
 ```
 
 Create a cephx key which OpenStack can use to access the pools.
-```
+```shell
 cephadm shell -- \
    ceph auth add client.openstack \ 
      mgr 'allow *' \
@@ -55,7 +57,7 @@ cephadm shell -- \
 ```
 
 Export the cephx key and Ceph configuration file.
-```
+```shell
 cephadm shell -- ceph auth get client.openstack > /etc/ceph/ceph.client.openstack.keyring
 cephadm shell -- ceph config generate-minimal-conf > /etc/ceph/ceph.conf
 ```
@@ -65,12 +67,12 @@ cephadm shell -- ceph config generate-minimal-conf > /etc/ceph/ceph.conf
 Transfer the cephx key and Ceph configuration file from the previous
 section to a host which can create resources in the openstack
 namespace. Base64 encode these files and store them in two variables.
-```
+```shell
 KEY=$(cat /etc/ceph/ceph.client.openstack.keyring | base64 -w 0)
 CONF=$(cat /etc/ceph/ceph.conf | base64 -w 0)
 ```
 Use the variables to create a `ceph-conf-files` secret.
-```
+```shell
 cat <<EOF > ceph_secret.yaml
 apiVersion: v1
 data:
@@ -88,7 +90,7 @@ oc create -f ceph_secret.yaml
 
 The Ceph FSID can be extracted from the secret using the following
 command.
-```
+```shell
 FSID=$(oc get secret ceph-conf-files -o json | jq -r '.data."ceph.conf"' | base64 -d | grep fsid | sed -e 's/fsid = //')
 ```
 The above will be useful for configuration snippets covered later in
@@ -103,7 +105,7 @@ has the following in the `OpenStackControlPlane` CR so that the
 Glance and Cinder volume pods mount the cephx key and Ceph
 configuration files in /etc/ceph.
 
-```
+```yaml
 apiVersion: core.openstack.org/v1beta1
 kind: OpenStackControlPlane
 spec:
@@ -128,7 +130,7 @@ spec:
             readOnly: true
 ```
 The `OpenStackDataPlane` can also use `extraMounts`.
-```
+```yaml
 apiVersion: dataplane.openstack.org/v1beta1
 kind: OpenStackDataPlane
 spec:
@@ -161,7 +163,7 @@ configuration file. For example, the sample
 [core_v1beta1_openstackcontrolplane_network_isolation_ceph.yaml](https://github.com/openstack-k8s-operators/openstack-operator/blob/main/config/samples/core_v1beta1_openstackcontrolplane_network_isolation_ceph.yaml)
 has the following in the `OpenStackControlPlane` CR:
 
-```
+```yaml
 apiVersion: core.openstack.org/v1beta1
 kind: OpenStackControlPlane
 spec:
@@ -189,7 +191,7 @@ configuration file. For example, the sample
 [core_v1beta1_openstackcontrolplane_network_isolation_ceph.yaml](https://github.com/openstack-k8s-operators/openstack-operator/blob/main/config/samples/core_v1beta1_openstackcontrolplane_network_isolation_ceph.yaml)
 has the following in the `OpenStackControlPlane` CR:
 
-```
+```yaml
 apiVersion: core.openstack.org/v1beta1
 kind: OpenStackControlPlane
 spec:
@@ -221,7 +223,7 @@ Use the `OpenStackDataPlane`
 [NovaTemplate](https://openstack-k8s-operators.github.io/dataplane-operator/openstack_dataplanerole/#novatemplate)
 to pass a `customServiceConfig`.
 
-```
+```yaml
 apiVersion: dataplane.openstack.org/v1beta1
 kind: OpenStackDataPlane
 spec:
@@ -255,7 +257,7 @@ file. For example, the sample
 [core_v1beta1_openstackcontrolplane_network_isolation_ceph.yaml](https://github.com/openstack-k8s-operators/openstack-operator/blob/main/config/samples/core_v1beta1_openstackcontrolplane_network_isolation_ceph.yaml)
 has the following in the OpenStackControlPlane CR:
 
-```
+```yaml
 apiVersion: core.openstack.org/v1beta1
 kind: OpenStackControlPlane
 spec:
