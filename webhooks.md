@@ -37,7 +37,7 @@ $ ls api/v1beta1
 ...
 -rw-rw-r--. 1 ocp ocp  4024 Mar 14 11:24 cinder_webhook.go
 ...
-```  
+```
 
 There are also additions/changes made to the `config` directory and to `main.go`.  Without going into detail in this doc, the `config` directory will now contain additional YAML to bundle the webhook definitions via operator-sdk such that they are installed alongside the operator via OLM.  The `main.go` changes consist of extra code to start a webserver within the operator controller-manager to serve the endpoints for the validating and mutating webhooks.
 
@@ -59,17 +59,8 @@ You can disable the webhooks if you don't need them for your local dev/testing p
 
 1. If you installed the operator via OLM, remove its webhook definitions from its CSV:
 
-**If you were running the operator from its own CSV**
-
 ```bash
 oc patch csv <your operator CSV> --type=json -p="[{'op': 'remove', 'path': '/spec/webhookdefinitions'}]"
-```
-
-**If you were running the operator within the OpenStack operator CSV**
-
-```bash
-oc get csv -n openstack-operators -l operators.coreos.com/openstack-operator.openstack-operators -o=jsonpath='{.items[0]}' | jq -r 'del(.spec.webhookdefinitions[] | select(.deploymentName=="<your operator name>-operator-controller-manager"))' > webhook_removal_patch.out
-oc patch csv -n openstack-operators $(oc get csv -n openstack-operators -l operators.coreos.com/openstack-operator.openstack-operators -o jsonpath='{.items[0].metadata.name}') --type=merge --patch-file=webhook_removal_patch.out
 ```
 
 2. Run the operator locally with the webhook server disabled:
@@ -85,17 +76,8 @@ Webhooks can be used outside of an OLM context if you want or need them.  Howeve
 
 1. First, if you installed the operator via OLM, remove its webhook definitions from its CSV:
 
-**If you were running the operator from its own CSV**
-
 ```bash
 oc patch csv <your operator CSV> --type=json -p="[{'op': 'remove', 'path': '/spec/webhookdefinitions'}]"
-```
-
-**If you were running the operator within the OpenStack operator CSV**
-
-```bash
-oc get csv -n openstack-operators -l operators.coreos.com/openstack-operator.openstack-operators -o=jsonpath='{.items[0]}' | jq -r 'del(.spec.webhookdefinitions[] | select(.deploymentName=="<your operator name>-operator-controller-manager"))' > webhook_removal_patch.out
-oc patch csv -n openstack-operators $(oc get csv -n openstack-operators -l operators.coreos.com/openstack-operator.openstack-operators -o jsonpath='{.items[0].metadata.name}') --type=merge --patch-file=webhook_removal_patch.out
 ```
 
 2. Now execute the `make` target to run the operator locally with webhooks enabled:
