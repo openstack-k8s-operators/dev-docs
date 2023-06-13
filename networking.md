@@ -506,4 +506,166 @@ spec:
 Additionally there is a CRD-less `service_controller`. It watches for `LoadBalancer` services in the same namespace of a `DNSMasq` instance and creates a `DNSData` CR to auto register service endpoints which have an annotation set with  `"dnsmasq.network.openstack.org/hostname": <hostname>`. This annotation gets auto added to the `LoadBalancer` services exposed using lib-common `https://github.com/openstack-k8s-operators/lib-common/pull/258`.
 
 ## IPAM
-TBD
+The the infra-operator privides CRDs for IPAM.
+
+The `NetConfig` CRD allows to describe the overall networks used for the environment.
+
+* a `network` described by `name`, `mtu` (default 1500), and one or multiple subnets.
+* a `subnet` described by: `name`, `cidr`, `vlan` (id), `gateway`, `routes`, `excludeAddresses` and `allocationRanges`. One or multiple `allocationRanges` can be defined, each with a `start` and `end` address. `routes` are optional, but one or multiple can be defined. Each route defining a `destination` network and `nexthop` router address. Using `excludeAddresses` individual IP addresses from within the `cidr` can be excluded to be assigned (dynamic or static).
+
+Example `NetConfig`:
+```yaml
+apiVersion: network.openstack.org/v1beta1
+kind: NetConfig
+metadata:
+  name: netconfig
+spec:
+  networks:
+  - name: CtlPlane
+    subnets:
+    - name: subnet1
+      allocationRanges:
+      - end: 192.168.122.120
+        start: 192.168.122.100
+      - end: 192.168.122.200
+        start: 192.168.122.150
+      cidr: 192.168.122.0/24
+      gateway: 192.168.122.1
+  - name: InternalApi
+    subnets:
+    - name: subnet1
+      allocationRanges:
+      - end: 172.17.0.250
+        start: 172.17.0.10
+      excludeAddresses:
+      - 172.17.0.10
+      - 172.17.0.12
+      cidr: 172.17.0.0/24
+      vlan: 20
+  - name: External
+    subnets:
+    - name: subnet1
+      allocationRanges:
+      - end: 10.0.0.250
+        start: 10.0.0.10
+      cidr: 10.0.0.0/24
+      gateway: 10.0.0.1
+      routes:
+      - destination: 10.0.1.0/24
+        nexthop: 10.0.0.100
+  - name: Storage
+    subnets:
+    - name: subnet1
+      allocationRanges:
+      - end: 172.18.0.250
+        start: 172.18.0.10
+      cidr: 172.18.0.0/24
+      vlan: 30
+  - name: StorageMgmt
+    subnets:
+    - name: subnet1
+      allocationRanges:
+      - end: 172.19.0.250
+        start: 172.19.0.10
+      cidr: 172.19.0.0/24
+      vlan: 40
+  - name: Tenant
+    mtu: 9000
+    subnets:
+    - name: subnet1
+      allocationRanges:
+      - end: 172.20.0.250
+        start: 172.20.0.10
+      cidr: 172.20.0.0/24
+      vlan: 50
+```
+
+The `IPSet` CRD can be used by a requestor to register IP addresses on one or more networks.
+
+The request is a list of networks with `name` and `subnetName`, optional `defaultRoute` for one subnet in total. Using the `fixedIP` a specific IP can be requested, if not already assigned. The `fixedIP` don't have to be from within an `allocationRange`.
+
+The status if the `IPSet` will have all details about the reserved IPs and network details to be used by the requestor. The `IPSet` can be used by the requestor if the overall `Ready` condition is `True`.
+
+Example to request IP reservation with requesting a `fixedIP` on the `InternalApi` network `subnet1`:
+```yaml
+kind: IPSet
+metadata:
+  annotations:
+    kubectl.kubernetes.io/last-applied-configuration: |
+      {"apiVersion":"network.openstack.org/v1beta1","kind":"IPSet","metadata":{"annotations":{},"name":"edpm-compute-0","namespace":"openstack"},"spec":{"networks":[{"defaultRoute":true,"name":"CtlPlane","subnetName":"subnet1"},{"fixedIP":"172.17.0.150","name":"InternalApi","subnetName":"subnet1"},{"name":"Storage","subnetName":"subnet1"},{"name":"Tenant","subnetName":"subnet1"},{"name":"External","subnetName":"subnet1"}]}}
+  creationTimestamp: "2023-05-25T07:27:31Z"
+  finalizers:
+  - IPSet
+  generation: 1
+  name: edpm-compute-0
+  namespace: openstack
+  resourceVersion: "4916903"
+  uid: 3901b2f3-f724-48fb-a906-7b46e9a5b19a
+spec:
+  networks:
+  - defaultRoute: true
+    name: CtlPlane
+    subnetName: subnet1
+  - fixedIP: 172.17.0.150
+    name: InternalApi
+    subnetName: subnet1
+  - name: Storage
+    subnetName: subnet1
+  - name: Tenant
+    subnetName: subnet1
+  - name: External
+    subnetName: subnet1
+status:
+  conditions:
+  - lastTransitionTime: "2023-05-25T07:27:31Z"
+    message: Setup complete
+    reason: Ready
+    status: "True"
+    type: Ready
+  - lastTransitionTime: "2023-05-25T07:27:31Z"
+    message: Input data complete
+    reason: Ready
+    status: "True"
+    type: InputReady
+  - lastTransitionTime: "2023-05-25T07:27:31Z"
+    message: Reservation successful
+    reason: Ready
+    status: "True"
+    type: ReservationReady
+  reservations:
+  - address: 192.168.122.100
+    cidr: 192.168.122.0/24
+    gateway: 192.168.122.1
+    mtu: 1500
+    network: CtlPlane
+    subnet: subnet1
+  - address: 10.0.0.10
+    cidr: 10.0.0.0/24
+    gateway: 10.0.0.1
+    mtu: 1500
+    network: External
+    routes:
+    - destination: 10.0.1.0/24
+      nexthop: 10.0.0.100
+    subnet: subnet1
+  - address: 172.17.0.150
+    cidr: 172.17.0.0/24
+    mtu: 1500
+    network: InternalApi
+    subnet: subnet1
+    vlan: 20
+  - address: 172.18.0.10
+    cidr: 172.18.0.0/24
+    mtu: 1500
+    network: Storage
+    subnet: subnet1
+    vlan: 30
+  - address: 172.20.0.10
+    cidr: 172.20.0.0/24
+    mtu: 1500
+    network: Tenant
+    subnet: subnet1
+    vlan: 50
+```
+
+The reservation is also storted via the `Reservation` CRD, but it is intended for "internal" use only.
