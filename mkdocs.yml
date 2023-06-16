@@ -1,0 +1,62 @@
+site_name: Podified controlplane docs
+site_description: Documentation related to podified controlplane
+site_author: OpenStack Team
+site_url: https://openstack-k8s-operators.github.io/docs
+repo_name: openstack-k8s-operators/docs
+repo_url: https://github.com/openstack-k8s-operators/docs
+theme:
+  features:
+    - search.suggest
+    - search.highlight
+    - search.share
+  name: material
+  logo: images/openstack-logo.png
+  palette:
+    - scheme: default
+      media: "(prefers-color-scheme: light)"
+      primary: teal
+      toggle:
+        icon: material/toggle-switch-off-outline
+        name: Switch to dark mode
+    - scheme: slate
+      media: "(prefers-color-scheme: dark)"
+      primary: teal
+      toggle:
+        icon: material/toggle-switch
+        name: Switch to light mode
+nav:
+  - Home: index.md
+  - Quickstart guide to start a new operator: new_operator.md
+  - Conditions usage: conditions.md
+  - Common issues: common_issues.md
+  - Implementation Guidelines: developer.md
+  - Quickstart on writing KUTTL tests for an operator: kuttl_tests.md
+  - Building operator images: image_build.md
+  - Debugging operator via vscode: debugging.md
+  - Running a local copy of an operator for development without conflicts: running_local_operator.md
+  - Webhooks usage: webhooks.md
+  - Networking: networking.md
+  - Operator controller manager pod labels: operator_controller_labels.md
+  - Testing operators with EnvTest: envtest.md
+  - Test strategy: test_strategy.md
+  - Strategy to provide files to services: extra_mounts.md
+  - Ceph: ceph.md
+  - Hyperconverged Infrastructure: hci.md
+  - Contributing: contributing.md
+markdown_extensions:
+  - toc:
+      permalink: "#"
+  - pymdownx.superfences
+  - admonition
+extra:
+  version:
+    provider: mike
+    default: latest
+plugins:
+  - git-revision-date
+  - build_plantuml:
+      diagram_root: "docs/diagrams"
+      output_format: "svg"
+  - search:
+      lang: en
+      prebuild_index: true

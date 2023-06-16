@@ -1,0 +1,5 @@
+mkdocs
+mike
+mkdocs-git-revision-date-plugin
+mkdocs-material
+mkdocs-build-plantuml-plugin
