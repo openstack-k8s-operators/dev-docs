@@ -47,6 +47,31 @@ It is furthermore recommended to add support for running the operator locally wi
 
 When the associated operator is deployed via OLM, its webhooks are installed in the cluster and cert management is automatically handled as well.  You don't need to do anything differently than you normally would for installing the operator.
 
+### Changing webhook defaults in OLM context
+
+To change the webhook environment variable defaults (those mentioned [here](https://github.com/openstack-k8s-operators/docs/blob/main/webhooks.md#why-did-we-introduce-webhooks)) for an operator that was deployed via OLM, do the following _after_ you have installed the operator and its CSV reaches the `Succeeded` state:
+
+1. Create a patch file to change the desired default
+
+```bash
+oc get csv -n openstack-operators -l operators.coreos.com/<OPERATOR_NAME>.openstack-operators -o=jsonpath='{.items[0]}' | jq '(.spec.install.spec.deployments[0].spec.template.spec.containers[1].env[] | select(.name=="<DEFAULT NAME>")) |= (.value="<NEW_DEFAULT_VALUE>")' > default_patch.out
+```
+
+Where...
+- `<OPERATOR_NAME>` is the name of the operator, for example: `keystone-operator`
+- `<DEFAULT_NAME>` is the default you wish to change, for example: `KEYSTONE_API_IMAGE_URL_DEFAULT`
+- `<NEW DEFAULT VALUE>` is the new default value you desire, for example: `quay.io/somerepo/someimage`
+
+If you have multiple defaults that you wish to change, add additional `(.spec.install.spec.deployments[0].spec.template.spec.containers[1].env[] | select(.name=="<DEFAULT NAME>")) |= (.value="<NEW_DEFAULT_VALUE>")` pipes to the `jq` command for each default.
+
+2. Apply the patch file against the CSV
+
+```bash
+oc patch csv -n openstack-operators $(oc get csv -n openstack-operators -l operators.coreos.com/<OPERATOR_NAME>.openstack-operators -o jsonpath='{.items[0].metadata.name}') --type=merge --patch-file=default_patch.out
+```
+
+This will cause the operator's controller-manager pod to be redeployed with your new environment variable defaults.
+
 ## Locally running an operator that has webhooks
 
 If you would like to run the operator locally, extra steps must be taken to either disable the webhooks completely or to enable them to run outside of an OLM context.
