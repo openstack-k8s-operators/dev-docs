@@ -510,8 +510,8 @@ The the infra-operator privides CRDs for IPAM.
 
 The `NetConfig` CRD allows to describe the overall networks used for the environment.
 
-* a `network` described by `name`, `mtu` (default 1500), and one or multiple subnets.
-* a `subnet` described by: `name`, `cidr`, `vlan` (id), `gateway`, `routes`, `excludeAddresses` and `allocationRanges`. One or multiple `allocationRanges` can be defined, each with a `start` and `end` address. `routes` are optional, but one or multiple can be defined. Each route defining a `destination` network and `nexthop` router address. Using `excludeAddresses` individual IP addresses from within the `cidr` can be excluded to be assigned (dynamic or static).
+* a `network` described by `name`, `mtu` (default 1500), `dnsDomain` and one or multiple subnets.
+* a `subnet` described by: `name`, `cidr`, `vlan` (id), `gateway`, `routes`, `excludeAddresses` and `allocationRanges`. One or multiple `allocationRanges` can be defined, each with a `start` and `end` address. `routes` are optional, but one or multiple can be defined. Each route defining a `destination` network and `nexthop` router address. Using `excludeAddresses` individual IP addresses from within the `cidr` can be excluded to be assigned (dynamic or static). A `dnsDomain` can also be set on the subnet. This will have precedence over the `dnsDomain` from the network on the IPSet status.
 
 Example `NetConfig`:
 ```yaml
@@ -522,6 +522,7 @@ metadata:
 spec:
   networks:
   - name: CtlPlane
+    dnsDomain: ctlplane.example.com
     subnets:
     - name: subnet1
       allocationRanges:
@@ -532,6 +533,7 @@ spec:
       cidr: 192.168.122.0/24
       gateway: 192.168.122.1
   - name: InternalApi
+    dnsDomain: internalapi.example.com
     subnets:
     - name: subnet1
       allocationRanges:
@@ -543,6 +545,7 @@ spec:
       cidr: 172.17.0.0/24
       vlan: 20
   - name: External
+    dnsDomain: external.example.com
     subnets:
     - name: subnet1
       allocationRanges:
@@ -554,6 +557,7 @@ spec:
       - destination: 10.0.1.0/24
         nexthop: 10.0.0.100
   - name: Storage
+    dnsDomain: storage.example.com
     subnets:
     - name: subnet1
       allocationRanges:
@@ -562,6 +566,7 @@ spec:
       cidr: 172.18.0.0/24
       vlan: 30
   - name: StorageMgmt
+    dnsDomain: storagemgmt.example.com
     subnets:
     - name: subnet1
       allocationRanges:
@@ -584,6 +589,8 @@ The `IPSet` CRD can be used by a requestor to register IP addresses on one or mo
 
 The request is a list of networks with `name` and `subnetName`, optional `defaultRoute` for one subnet in total. Using the `fixedIP` a specific IP can be requested, if not already assigned. The `fixedIP` don't have to be from within an `allocationRange`.
 
+The `immutable` parameter prevents updates to the IPSet spec via the webhook. This is a level of security to prevent changes to the object. If changes are required an additional step is required to set the `immutable` parameter to `false`, which indicates "yes I really know what I am doing".
+
 The status if the `IPSet` will have all details about the reserved IPs and network details to be used by the requestor. The `IPSet` can be used by the requestor if the overall `Ready` condition is `True`.
 
 Example to request IP reservation with requesting a `fixedIP` on the `InternalApi` network `subnet1`:
@@ -602,6 +609,7 @@ metadata:
   resourceVersion: "4916903"
   uid: 3901b2f3-f724-48fb-a906-7b46e9a5b19a
 spec:
+  immutable: true
   networks:
   - defaultRoute: true
     name: CtlPlane
@@ -635,12 +643,14 @@ status:
   reservations:
   - address: 192.168.122.100
     cidr: 192.168.122.0/24
+    dnsDomain: ctlplane.example.com
     gateway: 192.168.122.1
     mtu: 1500
     network: CtlPlane
     subnet: subnet1
   - address: 10.0.0.10
     cidr: 10.0.0.0/24
+    dnsDomain: external.example.com
     gateway: 10.0.0.1
     mtu: 1500
     network: External
@@ -650,18 +660,21 @@ status:
     subnet: subnet1
   - address: 172.17.0.150
     cidr: 172.17.0.0/24
+    dnsDomain: internalapi.example.com
     mtu: 1500
     network: InternalApi
     subnet: subnet1
     vlan: 20
   - address: 172.18.0.10
     cidr: 172.18.0.0/24
+    dnsDomain: storage.example.com
     mtu: 1500
     network: Storage
     subnet: subnet1
     vlan: 30
   - address: 172.20.0.10
     cidr: 172.20.0.0/24
+    dnsDomain: tenant.example.com
     mtu: 1500
     network: Tenant
     subnet: subnet1
