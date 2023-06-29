@@ -131,10 +131,7 @@ spec:
         id: 22
     - description: Configuring enp6s0
       ipv4:
-        address:
-        - ip: 192.168.122.10
-          prefix-length: 24
-        enabled: true
+        enabled: false
       ipv6:
         enabled: false
       mtu: 1500
@@ -444,8 +441,8 @@ sh-5.1# ip a
 
 ## Example: configure OpenStackControlPlane with isolated networks
 Examples on how to use the `OpenStackControlPlane` CRD can be found at
-* https://github.com/openstack-k8s-operators/openstack-operator/blob/master/config/samples/core_v1beta1_openstackcontrolplane_network_isolation.yaml
-* https://github.com/openstack-k8s-operators/openstack-operator/blob/master/config/samples/core_v1beta1_openstackcontrolplane_network_isolation_ceph.yaml
+* https://github.com/openstack-k8s-operators/openstack-operator/blob/main/config/samples/core_v1beta1_openstackcontrolplane_network_isolation.yaml
+* https://github.com/openstack-k8s-operators/openstack-operator/blob/main/config/samples/core_v1beta1_openstackcontrolplane_network_isolation_ceph.yaml
 
 ## DNS
 The the infra-operator privides CRDs to setup and manage a dnsmasq instances for DNS.
