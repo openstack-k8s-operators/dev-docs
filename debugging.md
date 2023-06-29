@@ -4,8 +4,8 @@
 
 ### Prerequisite
 
-* install [current used go version](https://github.com/openstack-k8s-operators/install_yamls/blob/master/devsetup/vars/default.yaml)
-* install [current used operator-sdk version](https://github.com/openstack-k8s-operators/install_yamls/blob/master/devsetup/vars/default.yaml)
+* install [current used go version](https://github.com/openstack-k8s-operators/install_yamls/blob/main/devsetup/vars/default.yaml)
+* install [current used operator-sdk version](https://github.com/openstack-k8s-operators/install_yamls/blob/main/devsetup/vars/default.yaml)
 * install vscode
 * make sure [go extension for vscode](https://marketplace.visualstudio.com/items?itemName=golang.Go)
 is installed

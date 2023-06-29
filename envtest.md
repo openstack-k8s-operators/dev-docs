@@ -205,7 +205,7 @@ previous section.
 ### Common helpers
 
 There is a set of common test functionality that lives in lib-common modules:
-* [`test`](https://github.com/openstack-k8s-operators/lib-common/tree/master/modules/test)
+* [`test`](https://github.com/openstack-k8s-operators/lib-common/tree/main/modules/test)
 module for non openstack-k8s-specific helpers:
   * Generic asserts functions like `ExpectCondition` that checks the status
   conditions of any openstack CRD
@@ -215,7 +215,7 @@ module for non openstack-k8s-specific helpers:
   See [docs](https://pkg.go.dev/github.com/openstack-k8s-operators/lib-common/modules/test/)
   for the full list.
 
-* [`test-operators`](https://github.com/openstack-k8s-operators/lib-common/tree/master/modules/test-operators)
+* [`test-operators`](https://github.com/openstack-k8s-operators/lib-common/tree/main/modules/test-operators)
 for the openstack-k8s-specific helpers that are depend on the api module of a
 list of service operators:
   * Helpers for managing openstack resources like `CreateKeystoneAPI`
@@ -315,4 +315,4 @@ So run operator-lint on your project to catch common mistakes.
 * [Kubebuilder envtest example](https://book.kubebuilder.io/cronjob-tutorial/writing-tests.html)
 * [Gomega (the assert library)](https://github.com/onsi/gomega)
 * [Ginkgo (the BDD test framework)](https://github.com/onsi/ginkgo)
-* [The nova-operator as the example test suite](https://github.com/openstack-k8s-operators/nova-operator/tree/master/test/functional)
+* [The nova-operator as the example test suite](https://github.com/openstack-k8s-operators/nova-operator/tree/main/test/functional)

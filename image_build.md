@@ -23,7 +23,7 @@ Also check the operator-sdk quickstart at https://sdk.operatorframework.io/docs/
 
 ## Creating images using github actions
 
-As part of the operators there is a [github action](https://github.com/openstack-k8s-operators/keystone-operator/blob/master/.github/workflows/build-keystone-operator.yaml) which builds and pushes the images to quay.io/openstack-k8s-operators.
+As part of the operators there is a [github action](https://github.com/openstack-k8s-operators/keystone-operator/blob/main/.github/workflows/build-keystone-operator.yaml) which builds and pushes the images to quay.io/openstack-k8s-operators.
 
 This action uses the following organization action secrets to be able to build and push the images
 

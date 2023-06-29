@@ -249,10 +249,10 @@ git add Dockerfile && git commit -m "update Dockerfile"
 ```
 
 ## Github workflows
-Add .github folder and workflows from e.g. [keystone-operator](https://github.com/openstack-k8s-operators/keystone-operator/tree/master/.github) and update to the new operator.
+Add .github folder and workflows from e.g. [keystone-operator](https://github.com/openstack-k8s-operators/keystone-operator/tree/main/.github) and update to the new operator.
 
 ## Create ClusterServiceVersion for the operator
-In `config/manifests/bases/` create `placement-operator.clusterserviceversion.yaml`, like [keystone-operator.clusterserviceversion.yaml](https://github.com/openstack-k8s-operators/keystone-operator/blob/master/config/manifests/bases/keystone-operator.clusterserviceversion.yaml)
+In `config/manifests/bases/` create `placement-operator.clusterserviceversion.yaml`, like [keystone-operator.clusterserviceversion.yaml](https://github.com/openstack-k8s-operators/keystone-operator/blob/main/config/manifests/bases/keystone-operator.clusterserviceversion.yaml)
 
 ## Create templates folder holding scripts/config templates
 ```bash
