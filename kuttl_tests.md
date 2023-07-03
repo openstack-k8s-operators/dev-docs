@@ -17,7 +17,7 @@ operator itself. A good place to find more information is the controller.go
 file for the operator, there you should find
 hints on what resources does the operator create and/or manage. Another source
 of information s the operator API where it list which attributes the operator 
-exposes. As an example, in keystone, one can find [here](https://github.com/openstack-k8s-operators/keystone-operator/blob/master/api/bases/keystone.openstack.org_keystoneapis.yaml) the properties of the API. Another good option would be to contact the people
+exposes. As an example, in keystone, one can find [here](https://github.com/openstack-k8s-operators/keystone-operator/blob/main/api/bases/keystone.openstack.org_keystoneapis.yaml) the properties of the API. Another good option would be to contact the people
 listed as approvers in the operator's `OWNERS` file. Below are some example of
 things to assert while writing the tests (they might not apply to all operators):
 
