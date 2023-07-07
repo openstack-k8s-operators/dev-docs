@@ -11,7 +11,7 @@ General information about Kubernetes/OpenShift webhooks can be found here:
 
 The initial injection of webhooks into our operators was done to achieve greater flexibility with container image defaults -- that is, for default OpenStack service images, not for the operators themselves.  By using mutating/defaulting webhooks, we are able to remove hard-coded `kubebuilder` annotation defaults from our CRD Golang types and instead provide them via environment variables ([example](https://github.com/openstack-k8s-operators/cinder-operator/blob/main/config/default/manager_default_images.yaml)).  These environment variables are read by the operator controller-manager during its initialization ([example](https://github.com/openstack-k8s-operators/cinder-operator/blob/feac84f5479a33a708ed94d5deedf9366b328038/main.go#L163-L171)) and are then available to the controller-manager's mutating/defaulting webhooks during CR creation, where they can be applied if the user has not included an explicit image in the CR definition ([example](https://github.com/openstack-k8s-operators/cinder-operator/blob/feac84f5479a33a708ed94d5deedf9366b328038/api/v1beta1/cinder_webhook.go#L66-L94)).
 
-Why do we need this environment-variable-based flexibility?  
+Why do we need this environment-variable-based flexibility?
 
 1. It allows for OpenStack service container image defaults to be changed in a live deployment _without_ having to respin an operator build and reinstall the updated operator (which would otherwise have to be done to pick up a `kubebuilder` annotation change).  Instead, the CSV for a live deployment of an operator can be edited to adjust the container image environment variables to point to whatever default is necessary.  This is extremely useful for what are known as "offline" or "air-gapped" or "disconnected" OCP clusters.  These types of clusters do not have external Internet access and would be unable to reach either the upstream or downstream (online) registries to pull the default container images.  Instead, after the operator is initially deployed, the CSV's environment variable declarations can be modified by the cluster administrator to point to images available in an internally-accessible private registry.
 
@@ -42,6 +42,232 @@ $ ls api/v1beta1
 There are also additions/changes made to the `config` directory and to `main.go`.  Without going into detail in this doc, the `config` directory will now contain additional YAML to bundle the webhook definitions via operator-sdk such that they are installed alongside the operator via OLM.  The `main.go` changes consist of extra code to start a webserver within the operator controller-manager to serve the endpoints for the validating and mutating webhooks.
 
 It is furthermore recommended to add support for running the operator locally with webhooks.  The pattern for doing so can be seen here: https://github.com/openstack-k8s-operators/cinder-operator/pull/155/files.
+
+### Reusing webhook logic
+
+Both the defaulting and the validation logic of the webhook are implemented in
+the service operators but to apply them meaningfully we need to call them
+from the openstack-operator as the webhhooks will run there in a real
+deployment to default values on the top level (i.e. OpenStackControlPlane) CRD,
+to provide valuable feedback to the end user while blocking invalid Spec
+values.
+
+To do so we need to follow an API pattern described below.
+
+**Defaulting**
+
+For the example lets assume that the service CRD is called Foo
+
+In the service operator:
+```golang
+func (r *Foo) Default() {
+	r.Spec.Default()
+}
+
+func (spec *FooSpec) Default() {
+    // Implement the defaulting logic on the Spec struct here
+}
+```
+
+In the openstack-operator:
+```golang
+func (r *OpenStackControlPlane) Default() {
+	r.DefaultServices()
+}
+
+func (r *OpenStackControlPlane) DefaultServices() {
+	if r.Spec.Foo.Enabled {
+		r.Spec.Foo.Template.Default()
+	}
+```
+So when the webhook runs in the service operator the call chain is:
+1. Foo.Default()
+2. FooSpec.Default()
+
+When the webhook runs in the openstack-operator the call chain is:
+1. OpenStackControlPlane.Default()
+2. FooSpec.Default()
+
+Therefore the service operator should not implement any defaulting logic in
+Foo.Default but all should be in FooSpec.Default() or in deeper calls
+
+For an implementation example see:
+* [nova-operator](https://github.com/openstack-k8s-operators/nova-operator/blob/769bb7a67de3cbc28c84c944301cef9b9bb157cc/api/v1beta1/nova_webhook.go#L64-L103)
+* [openstack-operator](https://github.com/openstack-k8s-operators/openstack-operator/blob/21e36c588ab7ff0c0dd441a393d121c96e648d13/apis/core/v1beta1/openstackcontrolplane_webhook.go#L238-L372)
+
+
+**Validation**
+
+The validation webhook is more complex than the defaulting one as it:
+1. Needs to return errors to the caller that can be different depending on
+   where the webhook runs
+2. Needs to specify the path of the field in the validated structure that
+   caused the validation error.
+3. Validation has multiple types, validation during create, update, or even
+   delete. The update validation has access to both the old and the new struct
+   value to be able to detect the change.
+
+The validation webhook needs to return a single StatusError even if it detects
+multiple failures. We chose to use an Invalid StatusError that is translated to
+a HTTP 422 response code. However within the response there is a cause list
+where the validation webhook can describe each error independently by passing
+an ErrorList to the NewInvalid call.
+
+Still assume that Foo is a service CRD.
+
+In the service operator
+```golang
+func (r *Foo) ValidateCreate() error {
+    errors := r.Spec.ValidateCreate(field.NewPath("spec"))
+
+    if len(errors) != 0 {
+        log.Info("validation failed", "name", r.Name)
+        return apierrors.NewInvalid(
+            schema.GroupKind{Group: "foo.openstack.org", Kind: "Foo"},
+            r.Name, errors)
+    }
+    return nil
+}
+
+func (r *FooSpec) ValidateCreate(basePath *field.Path) field.ErrorList {
+    // Implement the create validation here and return a list of errors.
+    var errors field.ErrorList
+    errors = append(errors,  r.ValidateMyFieldLength(basePath)...)
+
+    return errors
+}
+
+// ValidateMyFieldLength just an example validation, it is not part of the
+// pattern itself. The pattern stops at the Spec level.
+func (r. *FooSpec) ValidateMyFieldLength(basePath *field.Path) field.ErrorList {
+    var errors field.ErrorList
+
+    if len(r.myField) > 35 {
+        errors = append(
+            errors,
+            // Use the basePath to specify the absolute field path in the error
+            field.Invalid(
+                basePath.Child("myField"),
+                r.myField,
+                "should be shorter than 36 characters",
+            )
+        )
+    }
+    return errors
+}
+
+func (r *Foo) ValidateUpdate(old runtime.Object) error {
+    oldFoo, ok := old.(*Foo)
+    if !ok || oldFoo == nil {
+        return apierrors.NewInternalError(fmt.Errorf("unable to convert existing object"))
+    }
+
+    errors := r.Spec.ValidateUpdate(oldFoo.Spec, field.NewPath("spec"))
+
+    if len(errors) != 0 {
+        log.Info("validation failed", "name", r.Name)
+        return apierrors.NewInvalid(
+            schema.GroupKind{Group: "foo.openstack.org", Kind: "Foo"},
+            r.Name, errors)
+    }
+    return nil
+}
+
+func (r *FooSpec) ValidateUpdate(old *FooSpec, basePath *field.Path) field.ErrorList {
+    // Implement the create validation here and return a list of errors.
+    var errors field.ErrorList
+    // You can also reuse specific validation from create validation here if
+    // needed
+    errors = append(errors,  r.ValidateMyFieldLength(basePath)...)
+
+    return errors
+}
+
+```
+
+In the openstack-operator
+```golang
+func (r *OpenStackControlPlane) ValidateCreate() error {
+    var allErrs field.ErrorList
+    basePath := field.NewPath("spec")
+    if err := r.ValidateCreateServices(basePath); err != nil {
+        allErrs = append(allErrs, err...)
+    }
+
+    if len(allErrs) != 0 {
+        return apierrors.NewInvalid(
+            schema.GroupKind{Group: "core.openstack.org", Kind: "OpenStackControlPlane"},
+            r.Name, allErrs)
+    }
+
+    return nil
+}
+
+func (r *OpenStackControlPlane) ValidateCreateServices(basePath *field.Path) field.ErrorList {
+    var errors field.ErrorList
+    // We do validation that are not Create and Update specific here
+    errors := append(errors, r.ValidateServices(basePath)...)
+    // But also call the service Spec specific Create validation
+    if r.Spec.Foo.Enabled {
+        errors = append(errors, r.Spec.Foo.Template.ValidateCreate(basePath.Child("foo").Child("template"))...)
+    }
+    return errors
+}
+
+func (r *OpenStackControlPlane) ValidateUpdate(old runtime.Object) error {
+    oldControlPlane, ok := old.(*OpenStackControlPlane)
+    if !ok || oldControlPlane == nil {
+        return apierrors.NewInternalError(fmt.Errorf("unable to convert existing object"))
+    }
+
+    var allErrs field.ErrorList
+    basePath := field.NewPath("spec")
+    if err := r.ValidateUpdateServices(oldControlPlane.Spec, basePath); err != nil {
+        allErrs = append(allErrs, err...)
+    }
+
+    if len(allErrs) != 0 {
+        return apierrors.NewInvalid(
+            schema.GroupKind{Group: "core.openstack.org", Kind: "OpenStackControlPlane"},
+            r.Name, allErrs)
+    }
+
+    return nil
+}
+
+func (r *OpenStackControlPlane) ValidateUpdateServices(old *OpenStackControlPlaneSpec, basePath *field.Path) field.ErrorList {
+    var errors field.ErrorList
+    // We do validation that are not Create and Update specific here
+    errors := append(errors, r.ValidateServices(basePath)...)
+    // But also call the service Spec specific Update validation
+    if r.Spec.Foo.Enabled {
+        errors = append(
+            errors,
+            r.Spec.Foo.Template.ValidateUpdate(old.Foo.Template, basePath.Child("foo").Child("template"))...)
+    }
+    return errors
+}
+```
+
+So when the webhook runs in the service operator for a create the call chain
+is:
+1. Foo.ValidateCreate()
+2. FooSpec.ValidateCreate()
+3. FooSpec.ValidateMyFieldLength()
+
+When the webhook runs in the openstack-operator for an update the call chain
+is:
+1. OpenStackControlPlane.ValidateUpdate()
+2. FooSpec.ValidateUpdate()
+3. FooSpec.ValidateMyFieldLength()
+
+This validation chaining pattern can be further extended inside the service
+operator if the service operator not just implement a top level service CRD but
+also sub CRDs.
+
+For an implementation example see:
+* [nova-operator](https://github.com/openstack-k8s-operators/nova-operator/blob/769bb7a67de3cbc28c84c944301cef9b9bb157cc/api/v1beta1/nova_webhook.go#L133-L174)
+* [openstack-operator](https://github.com/openstack-k8s-operators/openstack-operator/blob/21e36c588ab7ff0c0dd441a393d121c96e648d13/apis/core/v1beta1/openstackcontrolplane_webhook.go#L59-L101)
 
 ## Running an operator that has webhooks via OLM
 
@@ -112,7 +338,7 @@ cd <your operator root dir>
 GOWORK= OPERATOR_TEMPLATES=./templates make run-with-webhook
 ```
 
-This `make` command will:  
+This `make` command will:
 
 1. Create self-signed certs for the webhooks and create `ValidatingWebhookConfiguration` and `MutatingWebhookConfiguration` resources within the cluster that use the certs.  The operator itself also knows where the find the certs in a default location on your local host (`/tmp/k8s-webhook-server/serving-certs`) and will use them when it starts running.
 2. Find the OpenShift SDN gateway IP for your CRC cluster.  If you are not using CRC, you will need to provide `CRC_IP=<OpenShift SDN gateway IP>` to the aforementioned `make` command!
@@ -120,5 +346,5 @@ This `make` command will:
 4. Open the local host's firewall to allow port 9443 traffic (the port used by the webhooks).  This is done in the `libvirt` `firewall-zone`.  _If your local cluster is running in a different zone, you will have to manually add a firewall rule for port 9443 TCP traffic yourself!_
 5. Finally, run the actual operator controller-manager and the webhook server.
 
-You should now be able to create CRs for the associated operator and have the webhook logic execute as expected.  
+You should now be able to create CRs for the associated operator and have the webhook logic execute as expected.
 **NOTE:** If you want to switch back to using the OLM-deployed version of your operator, you will need to manually `oc delete` the `ValidatingWebhookConfiguration` and `MutatingWebhookConfiguration` resources created by this `make` command!
