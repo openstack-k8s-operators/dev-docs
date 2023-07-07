@@ -87,18 +87,21 @@ Multus CNI enables attaching multiple network interfaces to pods. For each of th
 ### Connect OCP workers to the isolated networks
 Worker nodes need to be connected to the required isolated networks. `NodeNetworkConfigurationPolicy` (`nncp`) resources can be used to apply the desired state via the NMstate operator to the worker nodes.
 
-This `nncp` will configure the worker nodes interface `enp6s0` for using VLANs for network isolation:
+This `nncp` will configure the worker-X node interface `enp6s0` for using VLANs for network isolation:
 ```yaml
 apiVersion: nmstate.io/v1
 kind: NodeNetworkConfigurationPolicy
 metadata:
-  name: osp
+  name: osp-worker-X
 spec:
   desiredState:
     interfaces:
     - description: internalapi vlan interface
       ipv4:
-        enabled: false
+        address:
+        - ip: 172.17.0.10
+          prefix-length: 24
+        enabled: true
       ipv6:
         enabled: false
       name: enp6s0.20
@@ -109,7 +112,10 @@ spec:
         id: 20
     - description: storage vlan interface
       ipv4:
-        enabled: false
+        address:
+        - ip: 172.18.0.10
+          prefix-length: 24
+        enabled: true
       ipv6:
         enabled: false
       name: enp6s0.21
@@ -120,7 +126,10 @@ spec:
         id: 21
     - description: tenant vlan interface
       ipv4:
-        enabled: false
+        address:
+        - ip: 172.19.0.10
+          prefix-length: 24
+        enabled: true
       ipv6:
         enabled: false
       name: enp6s0.22
@@ -131,7 +140,10 @@ spec:
         id: 22
     - description: Configuring enp6s0
       ipv4:
-        enabled: false
+        address:
+        - ip: 192.168.122.10
+          prefix-length: 24
+        enabled: true
       ipv6:
         enabled: false
       mtu: 1500
@@ -139,6 +151,7 @@ spec:
       state: up
       type: ethernet
   nodeSelector:
+    kubernetes.io/hostname: worker-X
     node-role.kubernetes.io/worker: ""
 ```
 
