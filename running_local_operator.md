@@ -21,7 +21,7 @@ local operator will resolve its CR.
 
 ```
 oc get csv -n openstack-operators <your operator CSV> -o json | \
-  jq -r 'del(.metadata.generation, .metadata.resourceVersion)'  > operator_csv.json
+  jq -r 'del(.metadata.generation, .metadata.resourceVersion, .metadata.uid)'  > operator_csv.json
 ```
 
 2. Either patch the CSV for the operator so that it scales down to 0 controller-manager pod replicas:
