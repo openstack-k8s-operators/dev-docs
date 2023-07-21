@@ -205,24 +205,23 @@ previous section.
 ### Common helpers
 
 There is a set of common test functionality that lives in lib-common modules:
-* [`test`](https://github.com/openstack-k8s-operators/lib-common/tree/main/modules/test)
-module for non openstack-k8s-specific helpers:
+* [`common-helpers`](https://github.com/openstack-k8s-operators/lib-common/tree/main/modules/common/test/helpers)
+package in common module for non openstack-k8s-specific helpers:
   * Generic asserts functions like `ExpectCondition` that checks the status
   conditions of any openstack CRD
   * Helpers for managing resources like `CreateSecret` and `DeleteConfigMap`
   * Helpers for simulating external events like `SimulateJobSuccess`
 
-  See [docs](https://pkg.go.dev/github.com/openstack-k8s-operators/lib-common/modules/test/)
+  See [docs](https://pkg.go.dev/github.com/openstack-k8s-operators/lib-common/modules/common/)
   for the full list.
 
-* [`test-operators`](https://github.com/openstack-k8s-operators/lib-common/tree/main/modules/test-operators)
-for the openstack-k8s-specific helpers that are depend on the api module of a
-list of service operators:
+* [`test`](https://github.com/openstack-k8s-operators/lib-common/tree/main/modules/test)
+module for the openstack-k8s-specific helpers and fixtures that are dependent on the api module of a list of service operators:
   * Helpers for managing openstack resources like `CreateKeystoneAPI`
   * Helpers for simulating external events like `SimulateKeystoneEndpointReady`
   * `KeystoneAPIFixture` to simulate the OpenStack Keystone API.
 
-  See [docs](https://pkg.go.dev/github.com/openstack-k8s-operators/lib-common/modules/test-operators/)
+  See [docs](https://pkg.go.dev/github.com/openstack-k8s-operators/lib-common/modules/test/)
   for the full list.
 
 ## Execution
