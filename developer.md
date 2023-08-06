@@ -7,12 +7,30 @@ between the developers.
 You can also consult with the [OpenShift Operator Best Practices](https://redhat-openshift-ecosystem.github.io/community-operators-prod/best-practices/).
 
 ## Logging
-When you log from any of the controller implementations use the lib-common
-`utils.LogForObject` and `utils.LogErrorForObject` calls. These will make sure
-that the log line has enough information to identify the CR being reconciled.
-These calls need a lib-common `Helper` object. So in the short time window
-before such an object is created at the start of the reconcile call logging
-should be done via the logger provided by the `log.FromContext(ctx)` call.
+When you log from any of the controller implementations ,
+make use of "sigs.k8s.io/controller-runtime/pkg/log","github.com/go-logr/logr".
+Create a per operator/controller top level GetLogger func:
+```golang
+
+// GetLogger returns a logger object with a logging prefix of "controller.name"
+// and additional controller context fields
+func (r *ControllerStruct) GetLogger(ctx context.Context) logr.Logger {
+	return log.FromContext(ctx).WithName("Controllers").WithName(
+		"ControllerStructName")
+}
+```
+And that should be used in each individual controller func:
+```golang
+func (r *ControllerStruct)... Reconcile... {
+
+	Log := r.GetLogger(ctx)
+```
+An individual, per reconcile function log object logr instantiation will create
+a controller unique, race safe and precise logr object.
+It can then be used with log.Info and log.Error with a string / err obj. (for
+log.Error)  and more name/value pairs as needed: `log.Info(msg string,
+keysAndValues`. The context of the controller, reconcile id , etc would be
+automatically included in logger output.
 
 ## Clients
 The reconcile loop has access to two k8s clients `client` and `kclient`. As a
