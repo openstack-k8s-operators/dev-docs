@@ -101,7 +101,7 @@ firewall ports necessary to run the Ceph RBD block storage service
 from the EDPM storage network (`172.18.0.0/24`) because of the
 following defaults for the `edpm_ceph_hci_pre_storage_ranges` and
 `edpm_ceph_hci_pre_enabled_services` Ansible variables.
-```
+```yaml
 edpm_ceph_hci_pre_storage_ranges:
   - 172.18.0.0/24
 edpm_ceph_hci_pre_enabled_services:
@@ -496,9 +496,17 @@ spec:
         - validate-network
         - ceph-hci-pre
         - install-os
+        - ceph-client
         - configure-os
         - run-os
 ```
+In addition to restoring the default service list, the `ceph-client`
+service is added after `install-os` and before `configure-os`. The
+`ceph-client` service configures EDPM nodes as clients of a Ceph
+server by distributing the files, which Ceph clients use, which
+were made available as described in the "Add ExtraMounts" section
+of the document.
+
 It is not necessary to remove the `configure-network`,
 `validate-network`, or `ceph-hci-pre` services because those Ansible
 jobs won't be re-run. After the `oc edit` is complete new jobs will be

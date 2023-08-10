@@ -250,6 +250,33 @@ The `$FSID` value above should contain the actual FSID as described
 in the "Create a Ceph Secret" section. The FSID itself does not need
 to be considered secret.
 
+Update the `OpenStackDataPlane`
+[EDPM services list](https://openstack-k8s-operators.github.io/dataplane-operator/composable_services)
+to include the `ceph-client` service.
+
+```yaml
+apiVersion: dataplane.openstack.org/v1beta1
+kind: OpenStackDataPlane
+spec:
+  ...
+  roles:
+    edpm-compute:
+      ...
+      services:
+        - configure-network
+        - validate-network
+        - ceph-hci-pre
+        - install-os
+        - ceph-client
+        - configure-os
+        - run-os
+```
+The `ceph-client` service is an optional service added between
+default services `install-os` and `configure-os`. The `ceph-client`
+service configures EDPM nodes as clients of a Ceph server by
+distributing the files, which Ceph clients use, which were made
+available as described in the "Create a Ceph Secret" of the document.
+
 ## Configure Manila with native CephFS
 
 Use a customServiceConfig to pass overrides to Manila's configuration
