@@ -67,8 +67,9 @@ next sections will be required.
 
 ### Shorten the Service list
 
-Shorten the services list so that it only has the services called
-`configure-network` and `validate-network`.
+Shorten the services list and add the `ceph-hci-pre` service so that
+it only has `configure-network`, `validate-network`, and
+`ceph-hci-pre`.
 
 ```yaml
 apiVersion: dataplane.openstack.org/v1beta1
@@ -81,12 +82,40 @@ spec:
       services:
         - configure-network
         - validate-network
+        - ceph-hci-pre
 ```
 In the example above the services for `install-os`, `configure-os`,
 and `run-os` have been removed. If there are other services besides
-`configure-network` and `validate-network`, then remove them too but
-keep track of them as the full service list will need to be restored
-later.
+`configure-network`, `validate-network`, and `ceph-hci-pre`, then
+remove them too but keep track of them as the full service list will
+need to be restored later.
+
+The `ceph-hci-pre` service prepares EDPM nodes to host Ceph services
+after the network has been configured. It does this by running the
+edpm-ansible role called `ceph-hci-pre`. This role injects a
+`ceph-networks.yaml` file into `/var/lib/edpm-config/firewall`
+so that when the `edpm_nftables` role runs, after Ceph is deployed,
+firewall ports are open for Ceph services. By default the
+`ceph-networks.yaml` file only contains directives to open the
+firewall ports necessary to run the Ceph RBD block storage service
+from the EDPM storage network (`172.18.0.0/24`) because of the
+following defaults for the `edpm_ceph_hci_pre_storage_ranges` and
+`edpm_ceph_hci_pre_enabled_services` Ansible variables.
+```
+edpm_ceph_hci_pre_storage_ranges:
+  - 172.18.0.0/24
+edpm_ceph_hci_pre_enabled_services:
+  - ceph_mon
+  - ceph_mgr
+  - ceph_osd
+```
+If other Ceph services like RGW, CephFS, or Dashboard will be deployed
+on HCI nodes, then add additional services to the enabled services
+list above and override the empty list default for the
+`edpm_ceph_hci_pre_grafana_frontend_ranges` and
+`edpm_ceph_hci_pre_rgw_frontend_ranges` variables.
+For more informatoin, see the `ceph-hci-pre` role in the
+[edpm-ansible role documentation](https://openstack-k8s-operators.github.io/edpm-ansible/roles.html).
 
 ### Disable Nova
 
@@ -465,13 +494,14 @@ spec:
       services:
         - configure-network
         - validate-network
+        - ceph-hci-pre
         - install-os
         - configure-os
         - run-os
 ```
-It is not necessary to remove the `configure-network` or
-`validate-network` services because those Ansible jobs won't
-be re-run. After the `oc edit` is complete new jobs will be
+It is not necessary to remove the `configure-network`,
+`validate-network`, or `ceph-hci-pre` services because those Ansible
+jobs won't be re-run. After the `oc edit` is complete new jobs will be
 created which start with by implementing `install-os` service.
 Also, the Ansible roles which implement the network configuration are
 idempotent.
