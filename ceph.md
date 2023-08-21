@@ -219,40 +219,71 @@ to be considered secret.
 
 ## Configure Nova
 
-Use the `OpenStackDataPlane`
-[NovaTemplate](https://openstack-k8s-operators.github.io/dataplane-operator/openstack_dataplanerole/#novatemplate)
-to pass a `customServiceConfig`.
-
+Create a ConfigMap with content to be added to /etc/nova/nova.conf.d/,
+inside the nova_compute container, so that Nova uses Ceph RBD.
 ```yaml
-apiVersion: dataplane.openstack.org/v1beta1
-kind: OpenStackDataPlane
-spec:
-<snip>
-  roles:
-    edpm-compute:
-    <snip>
-        nova:
-          cellName: cell1
-          customServiceConfig: |
-            [libvirt]
-            images_type=rbd
-            images_rbd_pool=vms
-            images_rbd_ceph_conf=/etc/ceph/ceph.conf
-            images_rbd_glance_store_name=default_backend
-            images_rbd_glance_copy_poll_interval=15
-            images_rbd_glance_copy_timeout=600
-            rbd_user=openstack
-            rbd_secret_uuid=$FSID
-          deploy: true
-          novaInstance: nova
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ceph-nova
+data:
+  03-ceph-nova.conf: |
+    [libvirt]
+    images_type=rbd
+    images_rbd_pool=vms
+    images_rbd_ceph_conf=/etc/ceph/ceph.conf
+    images_rbd_glance_store_name=default_backend
+    images_rbd_glance_copy_poll_interval=15
+    images_rbd_glance_copy_timeout=600
+    rbd_user=openstack
+    rbd_secret_uuid=$FSID
 ```
+The filename, e.g. 03-ceph-nova.conf, must match "*nova*.conf" and
+the files are evaluated by Nova alphabetically (e.g. 01-foo-nova.conf
+is processed before 02-bar-nova.conf).
+
 The `$FSID` value above should contain the actual FSID as described
 in the "Create a Ceph Secret" section. The FSID itself does not need
 to be considered secret.
 
-Update the `OpenStackDataPlane`
+Create a custom version of the
+[nova service](https://github.com/openstack-k8s-operators/dataplane-operator/blob/main/config/services/dataplane_v1beta1_openstackdataplaneservice_nova.yaml)
+which ships with the dataplane operator so that it uses the ConfigMap
+by adding it to the `configMaps` list.
+```yaml
+---
+apiVersion: dataplane.openstack.org/v1beta1
+kind: OpenStackDataPlaneService
+metadata:
+  name: nova-custom-ceph
+spec:
+  label: dataplane-deployment-nova-custom-ceph
+  configMaps:
+    - ceph-nova
+  secrets:
+    - nova-cell1-compute-config
+  role:
+    name: "Deploy EDPM Nova-custom-ceph"
+    hosts: "all"
+    strategy: "linear"
+    tasks:
+      - name: "nova"
+        import_role:
+          name: "osp.edpm.edpm_nova"
+        tags:
+          - "edpm_nova"
+```
+The custom service is named `nova-custom-ceph`. It cannot be named
+`nova` because `nova` is an immutable default service and will
+overwrite any custom service with the same name during reconciliation.
+
+After the `ConfigMap` and `OpenStackDataPlaneService` services above
+have been created (e.g. `oc create -f ceph-nova.yaml`), update the
+`OpenStackDataPlane`
 [EDPM services list](https://openstack-k8s-operators.github.io/dataplane-operator/composable_services)
-to include the `ceph-client` service.
+to replace the `nova` service with `nova-custom-ceph` and add the
+`ceph-client` service.
 
 ```yaml
 apiVersion: dataplane.openstack.org/v1beta1
@@ -265,17 +296,29 @@ spec:
       services:
         - configure-network
         - validate-network
-        - ceph-hci-pre
         - install-os
-        - ceph-client
         - configure-os
         - run-os
+        - ceph-client
+        - ovn
+        - libvirt
+        - nova-custom-ceph
 ```
-The `ceph-client` service is an optional service added between
-default services `install-os` and `configure-os`. The `ceph-client`
-service configures EDPM nodes as clients of a Ceph server by
-distributing the files, which Ceph clients use, which were made
-available as described in the "Create a Ceph Secret" of the document.
+The `ceph-client` service should be added before the `libvirt` and
+`nova` (or `nova-custom-ceph` in this case) services. It configures
+EDPM nodes as clients of a Ceph server by distributing the files,
+which Ceph clients use, which were made available as described in the
+"Create a Ceph Secret" section of the document.
+
+When the `nova-custom-ceph` service Ansible job runs, it will copy
+overrides from the ConfigMaps onto the Nova hosts. It will also use
+`virsh secret-*` commands so that libvirt can retrieve the cephx
+secret by FSID. This can be confirmed, after the job is completed, by
+running the following on an EDPM node.
+
+```
+podman exec libvirt_virtsecretd virsh secret-get-value $FSID
+```
 
 ## Configure Manila with native CephFS
 
