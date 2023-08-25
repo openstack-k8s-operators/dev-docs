@@ -51,10 +51,13 @@ Create a cephx key which OpenStack can use to access the pools.
 ```shell
 cephadm shell -- \
    ceph auth add client.openstack \ 
-     mgr 'allow *' \
+     mgr 'allow rw' \
 	 mon 'allow r' \
 	 osd 'allow class-read object_prefix rbd_children, allow rwx pool=vms, allow rwx pool=volumes, allow rwx pool=images'
 ```
+If Manila is enabled in the OpenStack controlplane, then add `allow
+rwx pool=cephfs.cephfs.meta, allow rwx pool=cephfs.cephfs.data` to the
+end of the command above.
 
 Export the cephx key and Ceph configuration file.
 ```shell
@@ -96,6 +99,35 @@ FSID=$(oc get secret ceph-conf-files -o json | jq -r '.data."ceph.conf"' | base6
 The above will be useful for configuration snippets covered later in
 the document.
 
+### Regarding multiple Ceph keyrings
+
+There should only be one Ceph keyring file per Ceph cluster in the
+`ceph-conf-files` secret. If OpenStack is being configured to use
+multiple Ceph clusters, then the same `ceph-conf-files` secret
+should have all of the Ceph backend files as in this example.
+```yaml
+apiVersion: v1
+data:
+  ceph.client.openstack.keyring: $KEY
+  ceph.conf: $CONF
+  ceph2.client.openstack.keyring: $KEY2
+  ceph2.conf: $CONF2
+kind: Secret
+metadata:
+  name: ceph-conf-files
+  namespace: openstack
+type: Opaque
+```
+The example above can be used to pass two configuration files and two
+keyring files for the clusters known as "ceph" and "ceph2". When the
+command `virsh secret-get-value $FSID` is passed the unique FSID
+in `ceph.conf`, it will retrun the cephx secret key from
+`ceph.client.openstack.keyring`. If the same command is passed the
+unique FSID in `ceph2.conf`, it will retrun the cephx secret key from
+`ceph2.client.openstack.keyring`. The FSID must map one-to-one with
+the cephx secret. Thus, it is not supported to add an extra cephx
+key called `ceph2.client.other.keyring` to the example above.
+
 ## Access the Ceph Secret via extraMounts
 
 Use [extraMounts](extra_mounts.md) in CRs for pods which need to
@@ -103,7 +135,7 @@ access the Ceph secret. For example, the sample
 [core_v1beta1_openstackcontrolplane_network_isolation_ceph.yaml](https://github.com/openstack-k8s-operators/openstack-operator/blob/main/config/samples/core_v1beta1_openstackcontrolplane_network_isolation_ceph.yaml)
 has the following in the `OpenStackControlPlane` CR so that the
 Glance and Cinder volume pods mount the cephx key and Ceph
-configuration files in /etc/ceph.
+configuration files in `/etc/ceph`.
 
 ```yaml
 apiVersion: core.openstack.org/v1beta1
@@ -152,9 +184,13 @@ When a CR containing the above is created, an Ansible pod
 running on OpenShift mounts the files in the Ceph secret
 and copies them to the EDPM host using the
 [edpm_ceph_client_files](https://github.com/openstack-k8s-operators/edpm-ansible/tree/main/roles/edpm_ceph_client_files)
-Ansible role. The Nova containers then have a copy of /etc/ceph
+Ansible role. The Nova containers then have a copy of `/etc/ceph`
 that they can use to acccess the cephx key and Ceph configuration
 file.
+
+Though containers hosted on EDPM nodes use the path `/etc/ceph`
+to access the Ceph client files, they are stored in
+`/var/lib/openstack/config/ceph` on the EDPM nodes.
 
 ## Configure Glance
 
@@ -263,16 +299,7 @@ spec:
     - ceph-nova
   secrets:
     - nova-cell1-compute-config
-  role:
-    name: "Deploy EDPM Nova-custom-ceph"
-    hosts: "all"
-    strategy: "linear"
-    tasks:
-      - name: "nova"
-        import_role:
-          name: "osp.edpm.edpm_nova"
-        tags:
-          - "edpm_nova"
+  playbook: osp.edpm.nova
 ```
 The custom service is named `nova-custom-ceph`. It cannot be named
 `nova` because `nova` is an immutable default service and will
