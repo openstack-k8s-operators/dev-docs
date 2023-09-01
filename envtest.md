@@ -279,6 +279,12 @@ Here is an example launch configuration for vscode:
 Note that you at least needs to run the test with the make target to get the
 binaries downloaded to the local ./bin folder.
 
+### Debug with delve
+You can also use the command line debugger to debug the envtest execution:
+```shell
+KUBEBUILDER_ASSETS=$(pwd)/bin/k8s/1.26.1-linux-amd64 OPERATOR_TEMPLATES=$(pwd)/templates dlv test ./test/functional/...
+```
+
 ### CI
 
 If you have a make target defined based on the above steps then you can simply
@@ -295,7 +301,7 @@ Tips and tricks for improving the efficiency and organization of your Ginkgo tes
 
 2. When using envtest, create a unique namespace for each test run. This is necessary because namespaces cannot be deleted in a locally running envtest. For more information, refer to the [Kubebuilder documentation](https://book.kubebuilder.io/reference/envtest.html#namespace-usage-limitation) on namespace usage limitation.
 
-3. Use Ginkgo's table. Entry functionality to reduce the number of individual tests. By consolidating multiple test cases into a table, you can streamline your test suite and improve readability. Remember that if you want to use anything that is initialized in in `BeforeEach` ginkgo doesn’t know about it during [Spec traversing](https://github.com/onsi/ginkgo/issues/378). This augmenting issue can be avoided by similar patterns like [here](https://github.com/openstack-k8s-operators/nova-operator/blob/e07bd0cfbd9df09a208b64a97a943b752f416b1e/test/functional/nova_reconfiguration_test.go#L367). 
+3. Use Ginkgo's table. Entry functionality to reduce the number of individual tests. By consolidating multiple test cases into a table, you can streamline your test suite and improve readability. Remember that if you want to use anything that is initialized in in `BeforeEach` ginkgo doesn’t know about it during [Spec traversing](https://github.com/onsi/ginkgo/issues/378). This augmenting issue can be avoided by similar patterns like [here](https://github.com/openstack-k8s-operators/nova-operator/blob/e07bd0cfbd9df09a208b64a97a943b752f416b1e/test/functional/nova_reconfiguration_test.go#L367).
 
 4. Please avoid using hardcoded paths; instead, try adopting a similar approach as demonstrated in this [example](https://github.com/openstack-k8s-operators/nova-operator/commit/3ab489b1f59f7bf9fe6efdc72fbe058c65732318).
 
