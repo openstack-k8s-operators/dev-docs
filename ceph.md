@@ -381,6 +381,117 @@ spec:
                     cephfs_protocol_helper_type=CEPHFS
 ```
 
+## Configure Swift with a RGW backend
+
+It's possible to configure an external Ceph Object Gateway (RGW) as an Object
+Store service. Users can rely on the `Swift` client tool to interact with the
+object store service.
+To authenticate with the external RGW service, you must configure RGW to verify
+users and their roles in the Identity service (keystone).
+Run the following commands on an already deployed OpenStack control plane to
+create users and roles as they will be used by the RGW instances to interact with
+keystone.
+
+```bash
+openstack service create --name swift --description "OpenStack Object Storage" object-store
+openstack user create --project service --password $SWIFT_PASSWORD swift
+openstack role create swiftoperator
+openstack role create ResellerAdmin
+openstack role add --user swift --project service member
+openstack role add --user swift --project service admin
+
+export RGW_ENDPOINT=192.168.122.3
+for i in public internal; do
+    openstack endpoint create --region regionOne object-store $i http://$RGW_ENDPOINT:8080/swift/v1/AUTH_%\(tenant_id\)s;
+done
+
+openstack role add --project admin --user admin swiftoperator
+```
+
+- Replace `$SWIFT_PASSWORD` with the password that should be assigned to the
+  `swift` user.
+- Replace `192.168.122.3` with the IP address reserved as `$RGW_ENDPOINT`. If
+  network isolation is used make sure the reserved address can be reached by
+  the `swift` client that starts the connection.
+
+The following commands should be run on a Ceph server to deploy and configure
+a RGW service that will be able to serve object storage related requests.
+Before deploying the RGW instances, the first step is to make sure Ceph has the
+right `config-keys` required for the service to be able to interact with keystone.
+Add the following configuration to the Ceph cluster via `ceph config set` commands:
+
+```bash
+cephadm shell
+ceph config set global rgw_keystone_url "$KEYSTONE_ENDPOINT"
+ceph config set global rgw_keystone_verify_ssl false
+ceph config set global rgw_keystone_api_version 3
+ceph config set global rgw_keystone_accepted_roles "member, Member, admin"
+ceph config set global rgw_keystone_accepted_admin_roles "ResellerAdmin, swiftoperator"
+ceph config set global rgw_keystone_admin_domain default
+ceph config set global rgw_keystone_admin_project service
+ceph config set global rgw_keystone_admin_user swift
+ceph config set global rgw_keystone_admin_password "$SWIFT_PASSWORD"
+ceph config set global rgw_keystone_implicit_tenants true
+ceph config set global rgw_s3_auth_use_keystone true
+ceph config set global rgw_swift_versioning_enabled true
+ceph config set global rgw_swift_enforce_content_length true
+ceph config set global rgw_swift_account_in_url true
+ceph config set global rgw_trust_forwarded_https true
+ceph config set global rgw_max_attr_name_len 128
+ceph config set global rgw_max_attrs_num_in_req 90
+ceph config set global rgw_max_attr_size 1024
+```
+
+- Replace `$KEYSTONE_ENDPOINT` with the identity service public endpoint.
+- Replace `$SWIFT_PASSWORD` with the password assigned to the swift user in the
+  previous step.
+
+Deploy the RGW service and the associated ingress daemon:
+
+```bash
+cat <<EOF > "/tmp/rgw_spec"
+---
+service_type: rgw
+service_id: rgw
+service_name: rgw.rgw
+placement:
+  hosts:
+    - $HOST1
+    - $HOST2
+    ...
+    - $HOSTN
+networks:
+- $STORAGE_NETWORK
+spec:
+  rgw_frontend_port: 8082
+  rgw_realm: default
+  rgw_zone: default
+---
+service_type: ingress
+service_id: rgw.default
+service_name: ingress.rgw.default
+placement:
+  count: 1
+spec:
+  backend_service: rgw.rgw
+  frontend_port: 8080
+  monitor_port: 8999
+  virtual_ip: $STORAGE_NETWORK_VIP
+  virtual_interface_networks:
+  - $STORAGE_NETWORK
+```
+
+- Replace `$HOST1`, `$HOST2`, ..., `$HOSTN` with the number of Ceph nodes
+  where the RGW instances should be deployed;
+
+- Replace `$STORAGE_NETWORK` with the network range used to resolve the
+  interfaces where the radosgw processes should be bound;
+
+- Replace `$STORAGE_NETWORK_VIP` with the `VIP` used as haproxy frontend: this
+  address represents the `$RGW_ENDPOINT` that has been configured in the swift
+  endpoint.
+
+
 ## Full Examples
 
 The examples above are focussed on showing how a
