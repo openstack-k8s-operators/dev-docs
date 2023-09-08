@@ -18,3 +18,4 @@ Documentation related to podified controlplane.
 * [Ceph](ceph.md)
 * [Hyperconverged Infrastructure](hci.md)
 * [Service config and bootstrap](service_config.md)
+* [Overview of Writing EDPM services](edpm_service_overview.md)
