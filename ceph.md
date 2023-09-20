@@ -161,24 +161,23 @@ spec:
             mountPath: "/etc/ceph"
             readOnly: true
 ```
-The `OpenStackDataPlane` can also use `extraMounts`.
+The `OpenStackDataPlaneNodeSet` can also use `extraMounts`.
 ```yaml
 apiVersion: dataplane.openstack.org/v1beta1
-kind: OpenStackDataPlane
+kind: OpenStackDataPlaneNodeSet
 spec:
-  roles:
-    edpm-compute:
-      nodeTemplate:
-        extraMounts:
-        - extraVolType: Ceph
-          volumes:
-          - name: ceph
-            secret:
-              secretName: ceph-conf-files
-          mounts:
-          - name: ceph
-            mountPath: "/etc/ceph"
-            readOnly: true
+  ...
+  nodeTemplate:
+    extraMounts:
+    - extraVolType: Ceph
+      volumes:
+      - name: ceph
+        secret:
+          secretName: ceph-conf-files
+      mounts:
+      - name: ceph
+        mountPath: "/etc/ceph"
+        readOnly: true
 ```
 When a CR containing the above is created, an Ansible pod
 running on OpenShift mounts the files in the Ceph secret
@@ -307,14 +306,14 @@ overwrite any custom service with the same name during reconciliation.
 
 After the `ConfigMap` and `OpenStackDataPlaneService` services above
 have been created (e.g. `oc create -f ceph-nova.yaml`), update the
-`OpenStackDataPlane`
+`OpenStackDataPlaneNodeSet`
 [EDPM services list](https://openstack-k8s-operators.github.io/dataplane-operator/composable_services)
 to replace the `nova` service with `nova-custom-ceph` and add the
 `ceph-client` service.
 
 ```yaml
 apiVersion: dataplane.openstack.org/v1beta1
-kind: OpenStackDataPlane
+kind: OpenStackDataPlaneNodeSet
 spec:
   ...
   roles:
@@ -495,10 +494,10 @@ spec:
 ## Full Examples
 
 The examples above are focussed on showing how a
-single `OpenStackControlPlane` and `OpenStackDataPlane`
+single `OpenStackControlPlane` and `OpenStackDataPlaneNodeSet`
 CR can be modified to include Ceph configuration by adding
 `extraMounts` and `customServiceConfig`. Links to complete
 examples are below.
 
 - `OpenStackControlPlane`: [core_v1beta1_openstackcontrolplane_network_isolation_ceph.yaml](https://github.com/openstack-k8s-operators/openstack-operator/blob/main/config/samples/core_v1beta1_openstackcontrolplane_network_isolation_ceph.yaml)
-- `OpenStackDataPlane`: [dataplane_v1beta1_openstackdataplane_ceph.yaml](https://github.com/openstack-k8s-operators/dataplane-operator/blob/main/config/samples/dataplane_v1beta1_openstackdataplane_ceph.yaml)
+- `OpenStackDataPlaneNodeSet`: [dataplane_v1beta1_openstackdataplanenodeset_ceph.yaml](https://github.com/openstack-k8s-operators/dataplane-operator/blob/main/config/samples/dataplane_v1beta1_openstackdataplanenodeset_ceph.yaml)

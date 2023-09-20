@@ -11,34 +11,30 @@ deployments are also known as Hyperconverged Infrastructure (HCI).
 3. Configure OpenStack to use the collocated Ceph server
 
 In order to complete the above procedure, the `services` list of the
-`OpenStackDataPlane` CR needs to be edited.
+`OpenStackDataPlaneNodeSet` CR needs to be edited.
 
-## OpenStackDataPlane services list
+## OpenStackDataPlaneNodeSet services list
 
-EDPM nodes can be configured by creating an `OpenStackDataPlane` CRs
-(or `OpenStackDataPlaneRole` and `OpenStackDataPlaneNode` CRs)
-which the
+EDPM nodes can be configured by creating an
+`OpenStackDataPlaneNodeSet` CR which the
 [dataplane-operator](https://openstack-k8s-operators.github.io/dataplane-operator)
-will reconcile. These types of CRs have a `services` list like the
-following:
+will reconcile when an `OpenStackDataPlaneDeployment` CR is created.
+These types of CRs have a `services` list like the following:
 
 ```yaml
 apiVersion: dataplane.openstack.org/v1beta1
-kind: OpenStackDataPlane
+kind: OpenStackDataPlaneNodeSet
 spec:
   ...
-  roles:
-    edpm-compute:
-      ...
-      services:
-        - configure-network
-        - validate-network
-        - install-os
-        - configure-os
-        - run-os
-        - ovn
-        - libvirt
-        - nova
+  services:
+    - configure-network
+    - validate-network
+    - install-os
+    - configure-os
+    - run-os
+    - ovn
+    - libvirt
+    - nova
 ```
 Only the services which are on the list will be configured.
 
@@ -60,35 +56,33 @@ This example also assumes that the EDPM nodes:
 - Are at least three in number (Ceph clusters must have at least three
   nodes for redundancy)
 
-Create an `OpenStackDataPlane` CR file, e.g. `dataplane_cr.yaml` to
-represent the EDPM nodes. See
-[dataplane_v1beta1_openstackdataplane.yaml](https://github.com/openstack-k8s-operators/dataplane-operator/blob/main/config/samples/dataplane_v1beta1_openstackdataplane.yaml)
-for an example which you will modify as described in this document.
+Create an `OpenStackDataPlaneNodeSet` CR file,
+e.g. `dataplane_cr.yaml` to represent the EDPM nodes. See
+[dataplane_v1beta1_openstackdataplanenodeset.yaml](https://github.com/openstack-k8s-operators/dataplane-operator/blob/main/config/samples/dataplane_v1beta1_openstackdataplanenodeset.yaml)
+for an example to modify as described in this document.
 
 Do not yet create the CR in OpenShift as the edits described in the
-next sections will be required.
+next sections are required.
 
 ### Shorten the Service list
 
-Shorten the services list and add the `ceph-hci-pre` service so that
-it only has `configure-network`, `validate-network`, and
-`ceph-hci-pre`.
+Update the `services` list:
+
+- Add the `ceph-hci-pre` service before the `configure-os` service.
+- Remove any services after the `run-os` service for now.
 
 ```yaml
 apiVersion: dataplane.openstack.org/v1beta1
-kind: OpenStackDataPlane
+kind: OpenStackDataPlaneNodeSet
 spec:
   ...
-  roles:
-    edpm-compute:
-      ...
-      services:
-        - configure-network
-        - validate-network
-        - install-os
-        - configure-os
-        - ceph-hci-pre
-        - run-os
+  services:
+    - configure-network
+    - validate-network
+    - install-os
+    - ceph-hci-pre
+    - configure-os
+    - run-os
 ```
 In the example above the services for `ovn`, `libvirt`, and `nova`
 have been removed. If there are other services besides the one in
@@ -101,23 +95,28 @@ edpm-ansible role called `ceph-hci-pre`. This role injects a
 `ceph-networks.yaml` file into `/var/lib/edpm-config/firewall`
 so that when the `edpm_nftables` role runs, firewall ports are open
 for Ceph services. By default the `ceph-networks.yaml` file only
-contains directives to open the ports required by the Ceph RBD block
-storage service. This is because of the following default Ansible
-variable values:
+contains directives to open the ports required by the Ceph RBD
+(block), RGW (object) and NFS (files) services. This is because of the
+following default Ansible variable value:
 ```yaml
 edpm_ceph_hci_pre_enabled_services:
   - ceph_mon
   - ceph_mgr
   - ceph_osd
+  - ceph_rgw
+  - ceph_nfs
+  - ceph_rgw_frontend
+  - ceph_nfs_frontend
 ```
-If other Ceph services like RGW, CephFS, or Dashboard will be deployed
+If other Ceph services, like the Ceph Dashboard, will be deployed
 on HCI nodes, then add additional services to the enabled services
 list above. For more informatoin, see the `ceph-hci-pre` role in the
 [edpm-ansible role documentation](https://openstack-k8s-operators.github.io/edpm-ansible/roles.html).
 
-The `run-os` service is run after `ceph-hci-pre` because it enables
-the firewall rules which `ceph-hci-pre` put in place. The `run-os`
-service also configures NTP, which is requried by Ceph.
+The `configure-os` and `run-os` services are run after `ceph-hci-pre`
+because they enable the firewall rules which `ceph-hci-pre` put in
+place. The `run-os` service also configures NTP, which is requried by
+Ceph.
 
 ### Add a Ceph cluster network
 
@@ -441,21 +440,20 @@ and Ceph configuration file.
 
 ```yaml
 apiVersion: dataplane.openstack.org/v1beta1
-kind: OpenStackDataPlane
+kind: OpenStackDataPlaneNodeSet
 spec:
-  roles:
-    edpm-compute:
-      nodeTemplate:
-        extraMounts:
-        - extraVolType: Ceph
-          volumes:
-          - name: ceph
-            secret:
-              secretName: ceph-conf-files
-          mounts:
-          - name: ceph
-            mountPath: "/etc/ceph"
-            readOnly: true
+  ...
+  nodeTemplate:
+    extraMounts:
+    - extraVolType: Ceph
+      volumes:
+      - name: ceph
+        secret:
+          secretName: ceph-conf-files
+      mounts:
+      - name: ceph
+        mountPath: "/etc/ceph"
+        readOnly: true
 ```
 
 ### Restore the full services list
@@ -467,23 +465,20 @@ the full services list needs to be restored. For example:
 
 ```yaml
 apiVersion: dataplane.openstack.org/v1beta1
-kind: OpenStackDataPlane
+kind: OpenStackDataPlaneNodeSet
 spec:
   ...
-  roles:
-    edpm-compute:
-      ...
-      services:
-        - configure-network
-        - validate-network
-        - install-os
-        - configure-os
-        - ceph-hci-pre
-        - run-os
-        - ceph-client
-        - ovn
-        - libvirt
-        - nova-custom-ceph
+  services:
+    - configure-network
+    - validate-network
+    - install-os
+    - configure-os
+    - ceph-hci-pre
+    - run-os
+    - ceph-client
+    - ovn
+    - libvirt
+    - nova-custom-ceph
 ```
 In addition to restoring the default service list, the `ceph-client`
 service is added after `run-os`. The `ceph-client` service configures
