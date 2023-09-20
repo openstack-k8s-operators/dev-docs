@@ -71,9 +71,9 @@ ports for the Ceph Monitoring service.
     dport: [6789, 3300]
 ```
 
-When the `run-os`
-[composable service](https://openstack-k8s-operators.github.io/dataplane-operator/composable_services/)
-runs, it executes the role
+When the `configure-os` and `run-os`
+[composable services](https://openstack-k8s-operators.github.io/dataplane-operator/composable_services/)
+run, they execute the role
 [edpm_nftables](https://github.com/openstack-k8s-operators/edpm-ansible/tree/main/roles/edpm_nftables)
 This role reads files in `/var/lib/edpm-config/firewall/`
 and creates a `edpm-rules.nft` file in `/etc/nftables/` and then
@@ -94,11 +94,11 @@ which results in the following output from the NFT command.
 		tcp dport { 3300, 6789 } ct state new counter packets 0 bytes 0 accept comment "110 allow ceph_mon"
 [root@edpm-compute-0 ~]# 
 ```
-If the service needs to be deployed after the `run-os` service has
-run, then the Ansible for that service can directly call the
-`edpm_nftables` role to update the files in `/etc/nftables` and
-reload the rules. An example of this from the `edpm_libvirt` role
-is below.
+If the service needs to be deployed after the `configure-os` and
+`run-os` services have run, then the Ansible for that service can
+directly call the `edpm_nftables` role to update the files in
+`/etc/nftables` and reload the rules. An example of this from the
+`edpm_libvirt` role is below.
 
 ```yaml
 - name: Copy qemu vnc firewall config
