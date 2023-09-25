@@ -250,113 +250,75 @@ spec:
 
 ### Configure exposing services to isolated networks
 #### Service API component
-Each API component of a service supports exposing their endpoint to an isolated network
+Each API component of a service supports service overrides which allows to customize the created k8s service for an endpoint. The default service type for an endpoint is `ClusterIP` service. To expose an API endpoint to the isolated network a `LoadBalancer` can be used.
 
+For services which get registered to different OpenStack endpoint types a hash `map[service.Endpoint]service.RoutedOverrideSpec` is used, where the key is either `public` or `internal`.
+
+Example: To expose the internal keystone endpoint using a MetalLB k8s LoadBalancer via the service override, the `LoadBalancer` type in the spec and required annotations in the metadata has to be set:
 ```yaml
-  externalEndpoints:
-    description: ExternalEndpoints, expose a VIP using a pre-created IPAddressPool
-    items:
-      description: MetalLBConfig to configure the MetalLB loadbalancer service
-      properties:
-        endpoint:
-          description: Endpoint, OpenStack endpoint this service maps to
-          enum:
-          - internal
-          - public
-          type: string
-        ipAddressPool:
-          description: IPAddressPool expose VIP via MetalLB on the IPAddressPool
-          minLength: 1
-          type: string
-        loadBalancerIPs:
-          description: LoadBalancerIPs, request given IPs from the pool
-            if available. Using a list to allow dual stack (IPv4/IPv6) support
-          items:
-            type: string
-          type: array
-        sharedIP:
-          default: true
-          description: SharedIP if true, VIP/VIPs get shared with multiple services
-          type: boolean
-        sharedIPKey:
-          default: ""
-          description: SharedIPKey specifies the sharing key which gets
-            set as the annotation on the LoadBalancer service. Services
-            which share the same VIP must have the same SharedIPKey. Defaults
-            to the IPAddressPool if SharedIP is true, but no SharedIPKey
-            specified.
-          type: string
-      required:
-      - endpoint
-      - ipAddressPool
+  keystone:
+    apiOverride:
+      route: {}
+    template:
+      override:
+        service:
+          internal:
+            metadata:
+              annotations:
+                metallb.universe.tf/address-pool: internalapi
+                metallb.universe.tf/allow-shared-ip: internalapi
+                metallb.universe.tf/loadBalancerIPs: 172.17.0.80
+            spec:
+              type: LoadBalancer
 ```
 
-Example:
-```yaml
-  externalEndpoints:
-  - endpoint: internal
-    ipAddressPool: internalapi
-    loadBalancerIPs:
-    - 172.17.0.80
-    sharedIP: true
-    sharedIPKey: ""
-```
+Per default a `ClusterIP` k8s service gets created for the public API endpoint. The service operators set an annotation on the service which triggers the openstack-operator to expose this service using an OpenShift route. In case the public endpoint should be exposed using a `LoadBalancer` k8s service, the override for the service, as shown above, can be used again to define e.g. a MetalLB service to be used instead.
+
+ ```
+   keystone:
+    apiOverride:
+      route: {}
+    template:
+      override:
+        service:
+          internal:
+            ...
+          public:
+            metadata:
+              annotations:
+                metallb.universe.tf/address-pool: public
+                metallb.universe.tf/allow-shared-ip: public
+                metallb.universe.tf/loadBalancerIPs: 10.0.0.80
+            spec:
+              type: LoadBalancer
+ ```
 
 #### RabbitMQ
-RabbitMQ instances can be exposed to an isolated network using the `externalEndpoint` parameter in the `OpenStackControlPlane` CRD.
+RabbitMQ instances can be exposed to an isolated network in the same way. The RabbitMQ CRD supports service overrides which can be used to create a `LoadBalancer` type k8s service which allows connection to the service from an isolated network
 **Note** multiple RabbitMQ instances can not share the same VIP as they use the same port. If multiple RabbitMQ instances need to be exposed to the same network distinct ip address have to be used.
-
-```yaml
-  externalEndpoint:
-    description: ExternalEndpoint, expose a VIP via MetalLB
-      on the pre-created address pool
-    properties:
-      ipAddressPool:
-        description: IPAddressPool expose VIP via MetalLB on
-          the IPAddressPool
-        minLength: 1
-        type: string
-      loadBalancerIPs:
-        description: LoadBalancerIPs, request given IPs from
-          the pool if available. Using a list to allow dual
-          stack (IPv4/IPv6) support
-        items:
-          type: string
-        type: array
-      sharedIP:
-        default: true
-        description: SharedIP if true, VIP/VIPs get shared with
-          multiple services
-        type: boolean
-      sharedIPKey:
-        default: ""
-        description: SharedIPKey specifies the sharing key which
-          gets set as the annotation on the LoadBalancer service.
-          Services which share the same VIP must have the same
-          SharedIPKey. Defaults to the IPAddressPool if SharedIP
-          is true, but no SharedIPKey specified.
-        type: string
-    required:
-    - ipAddressPool
-    type: object
-```
 
 Example exposing two RabbitMQ instances to the internal api network:
 ```yaml
   rabbitmq:
     templates:
       rabbitmq:
-        externalEndpoint:
-          loadBalancerIPs:
-          - 172.17.0.85
-          ipAddressPool: internalapi
-          sharedIP: false
+        override:
+          service:
+            metadata:
+              annotations:
+                metallb.universe.tf/address-pool: internalapi
+                metallb.universe.tf/loadBalancerIPs: 172.17.0.85
+            spec:
+              type: LoadBalancer
       rabbitmq-cell1:
-        externalEndpoint:
-          loadBalancerIPs:
-          - 172.17.0.86
-          ipAddressPool: internalapi
-          sharedIP: false
+        override:
+          service:
+            metadata:
+              annotations:
+                metallb.universe.tf/address-pool: internalapi
+                metallb.universe.tf/loadBalancerIPs: 172.17.0.86
+            spec:
+              type: LoadBalancer
 ```
 
 ### Example: expose GlanceAPI to an isolated network
@@ -374,11 +336,17 @@ spec:
   ...
   glanceAPIInternal:
     ...
-    externalEndpoints:
-      - endpoint: internal
-        ipAddressPool: internalapi
-        loadBalancerIPs:
-        - "172.17.0.80"
+    override:
+      service:
+        metadata:
+          annotations:
+            metallb.universe.tf/address-pool: internalapi
+            metallb.universe.tf/allow-shared-ip: internalapi
+            metallb.universe.tf/loadBalancerIPs: 172.17.0.80
+          labels:
+            service: glance
+        spec:
+          type: LoadBalancer
     ...
 ...
 ```
