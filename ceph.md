@@ -441,7 +441,8 @@ ceph config set global rgw_max_attrs_num_in_req 90
 ceph config set global rgw_max_attr_size 1024
 ```
 
-- Replace `$KEYSTONE_ENDPOINT` with the identity service public endpoint.
+- Replace `$KEYSTONE_ENDPOINT` with the identity service internal endpoint (the
+  EDPM nodes are able to resolve the internal endpoint and not the public one)
 - Replace `$SWIFT_PASSWORD` with the password assigned to the swift user in the
   previous step.
 
