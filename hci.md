@@ -138,7 +138,7 @@ the storage network. It does not cover the `storage_mgmt` network
 since that network is used exclusively by Ceph.
 
 The example
-[dataplane_v1beta1_openstackdataplanenodeset_hci.yaml](https://github.com/openstack-k8s-operators/dataplane-operator/blob/main/config/samples/dataplane_v1beta1_openstackdataplanenodeset_hci.yaml)
+[dataplane_v1beta1_openstackdataplanenodeset_ceph_hci.yaml](https://github.com/openstack-k8s-operators/dataplane-operator/blob/main/config/samples/dataplane_v1beta1_openstackdataplanenodeset_ceph_hci.yaml)
 has both the `storage` and `storage_mgmt` networks since those EDPM
 nodes will host Ceph OSDs.
 
@@ -153,7 +153,7 @@ management network range is `172.20.0.0/24` and that it is on `VLAN23`.
 ### MTU Settings for Ceph
 
 The example
-[dataplane_v1beta1_openstackdataplanenodeset_hci.yaml](https://github.com/openstack-k8s-operators/dataplane-operator/blob/main/config/samples/dataplane_v1beta1_openstackdataplanenodeset_hci.yaml)
+[dataplane_v1beta1_openstackdataplanenodeset_ceph_hci.yaml](https://github.com/openstack-k8s-operators/dataplane-operator/blob/main/config/samples/dataplane_v1beta1_openstackdataplanenodeset_ceph_hci.yaml)
 changes the MTU of the `storage` and `storage_mgmt`
 network from `1500` to `9000` (jumbo frames) for improved storage
 performance (though it is not mandatory to increase the MTU). If jumbo
