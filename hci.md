@@ -124,11 +124,13 @@ Ceph normally uses two networks:
 
 - `storage` - Storage traffic, the Ceph `public_network`, e.g. Glance,
   Cinder and Nova containers use this network for RBD traffic to the
-  Ceph cluster.
+  Ceph cluster. Block (RBD) storage clients of Ceph need access to
+  this network.
 
 - `storage_mgmt` - Storage management traffic (such as replication
   traffic between storage nodes), the Ceph `cluster_network`,
-  e.g. Ceph OSDs use this network to replicate data.
+  e.g. Ceph OSDs use this network to replicate data. This network
+  is used by Ceph OSD servers but not Ceph clients.
 
 The [Networking Documentation](networking.md) covers the `storage`
 network since pods in OpenShift and containers on RHEL needs to access
@@ -136,73 +138,23 @@ the storage network. It does not cover the `storage_mgmt` network
 since that network is used exclusively by Ceph.
 
 The example
-[dataplane_v1beta1_openstackdataplane_ceph.yaml](https://github.com/openstack-k8s-operators/dataplane-operator/blob/main/config/samples/dataplane_v1beta1_openstackdataplane_ceph.yaml)
-uses a storage network but not a storage management network.
-Modify the CR to set
+[dataplane_v1beta1_openstackdataplanenodeset_ceph_hci.yaml](https://github.com/openstack-k8s-operators/dataplane-operator/blob/main/config/samples/dataplane_v1beta1_openstackdataplanenodeset_ceph_hci.yaml)
+has both the `storage` and `storage_mgmt` networks since those EDPM
+nodes will host Ceph OSDs.
+
+Modify your DataPlaneNodeSet CR to set
 [edpm-ansible](https://github.com/openstack-k8s-operators/edpm-ansible)
 variables so that the
 [edpm_network_config role](https://github.com/openstack-k8s-operators/edpm-ansible/blob/main/roles/edpm_network_config/)
 will configure a storage management network which Ceph will use as a
 cluster network. For this example we'll assume that the storage
 management network range is `172.20.0.0/24` and that it is on `VLAN23`.
-A diff of the modified file should look similar to the following.
-
-```diff
-@@ -18,6 +18,7 @@
-           ctlplane_ip: 192.168.122.100
-           internal_api_ip: 172.17.0.100
-           storage_ip: 172.18.0.100
-+          storage_mgmt_ip: 172.20.0.100
-           tenant_ip: 172.10.0.100
-           fqdn_internal_api: '{{ ansible_fqdn }}'
-       role: edpm-compute
-@@ -32,6 +33,7 @@
-           ctlplane_ip: 192.168.122.101
-           internal_api_ip: 172.17.0.101
-           storage_ip: 172.18.0.101
-+          storage_mgmt_ip: 172.20.0.101
-           tenant_ip: 172.10.0.101
-           fqdn_internal_api: '{{ ansible_fqdn }}'
-       openStackAnsibleEERunnerImage: quay.io/openstack-k8s-operators/openstack-ansibleee-runner:latest
-@@ -47,6 +49,7 @@
-           ctlplane_ip: 192.168.122.102
-           internal_api_ip: 172.17.0.102
-           storage_ip: 172.18.0.102
-+          storage_mgmt_ip: 172.20.0.102
-           tenant_ip: 172.10.0.102
-           fqdn_internal_api: '{{ ansible_fqdn }}'
-@@ -109,6 +109,10 @@
-           storage_vlan_id: 21
--          storage_mtu: 1500
-+          storage_mtu: 9000
-           storage_cidr: '24'
-           storage_host_routes: []
-+          storage_mgmt_mtu: 9000
-+          storage_mgmt_vlan_id: 23
-+          storage_mgmt_cidr: '24'
-+          storage_mgmt_host_routes: []
-           tenant_mtu: 1500
-           tenant_vlan_id: 22
-           tenant_cidr: '24'
-@@ -116,11 +120,13 @@
-           role_networks:
-           - InternalApi
-           - Storage
-+          - StorageMgmt
-           - Tenant
-           networks_lower:
-             External: external
-             InternalApi: internal_api
-             Storage: storage
-+            StorageMgmt: storage_mgmt
-             Tenant: tenant
-```
-It is not necessary to add the storage management network to the
-`networkAttachments` key.
 
 ### MTU Settings for Ceph
 
-The example above changes the MTU of the `storage` and `storage_mgmt`
+The example
+[dataplane_v1beta1_openstackdataplanenodeset_ceph_hci.yaml](https://github.com/openstack-k8s-operators/dataplane-operator/blob/main/config/samples/dataplane_v1beta1_openstackdataplanenodeset_ceph_hci.yaml)
+changes the MTU of the `storage` and `storage_mgmt`
 network from `1500` to `9000` (jumbo frames) for improved storage
 performance (though it is not mandatory to increase the MTU). If jumbo
 frames are used, then all network switch ports in the data path must
