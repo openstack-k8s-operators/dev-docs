@@ -204,24 +204,36 @@ previous section.
 
 ### Common helpers
 
-There is a set of common test functionality that lives in lib-common modules:
-* [`common-helpers`](https://github.com/openstack-k8s-operators/lib-common/tree/main/modules/common/test/helpers)
+There is a set of common test functionality that lives in various modules:
+* [`lib-common/module/common/test/helpers`](https://github.com/openstack-k8s-operators/lib-common/tree/main/modules/common/test/helpers)
 package in common module for non openstack-k8s-specific helpers:
   * Generic asserts functions like `ExpectCondition` that checks the status
   conditions of any openstack CRD
   * Helpers for managing resources like `CreateSecret` and `DeleteConfigMap`
   * Helpers for simulating external events like `SimulateJobSuccess`
 
-  See [docs](https://pkg.go.dev/github.com/openstack-k8s-operators/lib-common/modules/common/)
+  See [docs](https://pkg.go.dev/github.com/openstack-k8s-operators/lib-common/modules/common@main/test/helpers)
   for the full list.
 
-* [`test`](https://github.com/openstack-k8s-operators/lib-common/tree/main/modules/test)
-module for the openstack-k8s-specific helpers and fixtures that are dependent on the api module of a list of service operators:
-  * Helpers for managing openstack resources like `CreateKeystoneAPI`
-  * Helpers for simulating external events like `SimulateKeystoneEndpointReady`
-  * `KeystoneAPIFixture` to simulate the OpenStack Keystone API.
+* [`lib-common/module/test`](https://github.com/openstack-k8s-operators/lib-common/tree/main/modules/test)
+module serves as a base for the openstack-k8s-specific helpers and fixtures and
+contains generic CRD helpers as well as helper for the certmanager operator.
+See [docs](https://pkg.go.dev/github.com/openstack-k8s-operators/lib-common/modules/test@main/)
+  for the full list.
 
-  See [docs](https://pkg.go.dev/github.com/openstack-k8s-operators/lib-common/modules/test/)
+* [`keystone-operator/api/test/helpers`](https://github.com/openstack-k8s-operators/keystone-operator/tree/main/api/test/helpers)
+contains helpers for the keystone CRDs.
+See [docs](https://pkg.go.dev/github.com/openstack-k8s-operators/keystone-operator/api@main/test/helpers)
+  for the full list.
+
+* [`infra-operator/api/test/helpers`](https://github.com/openstack-k8s-operators/infra-operator/tree/main/apis/test/helpers)
+contains helpers for the TransportURL and Memcached CRDs.
+See [docs](https://pkg.go.dev/github.com/openstack-k8s-operators/infra-operator/apis@main/test/helpers)
+  for the full list.
+
+* [`mariadb-operator/api/test/helpers`](https://github.com/openstack-k8s-operators/mariadb-operator/tree/main/api/test/helpers)
+contains helpers for the MariaDB and MariaDBDatabase CRDs.
+See [docs](https://pkg.go.dev/github.com/openstack-k8s-operators/mariadb-operator/api@main/test/helpers)
   for the full list.
 
 ## Execution
