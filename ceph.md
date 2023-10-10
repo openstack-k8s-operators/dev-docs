@@ -193,6 +193,21 @@ to access the Ceph client files, they are stored in
 
 ## Configure Glance
 
+When Glance is configured with Ceph it's recommended to enable
+[image conversion](https://github.com/openstack-k8s-operators/glance-operator/tree/main/config/samples/import_plugins).
+
+Create a PVC to host a staging area using the example
+[image_conversion_pvc.yaml](https://github.com/openstack-k8s-operators/glance-operator/blob/main/config/samples/import_plugins/image_conversion/image_conversion_pvc.yaml)
+from the glance-operator repository.
+```
+oc create -f image_conversion_pvc.yaml
+```
+Change the storage size of the requested PVC to be as large as the largest
+expected image after it has been converted into RAW format with a command
+like `qemu-img convert -f qcow2 -O raw cirros.img cirros.raw`. When an image
+is uploaded, Glance will use this space to convert it to RAW so that Ceph
+can create volumes and VMs from the image efficiently using COW references.
+
 Use a `customServiceConfig` to pass overrides to Glance's
 configuration file. For example, the sample
 [core_v1beta1_openstackcontrolplane_network_isolation_ceph.yaml](https://github.com/openstack-k8s-operators/openstack-operator/blob/main/config/samples/core_v1beta1_openstackcontrolplane_network_isolation_ceph.yaml)
@@ -210,6 +225,7 @@ spec:
       customServiceConfig: |
         [DEFAULT]
         enabled_backends = default_backend:rbd
+        enabled_import_methods=[web-download,glance-direct]
         [glance_store]
         default_backend = default_backend
         [default_backend]
@@ -217,6 +233,10 @@ spec:
         store_description = "RBD backend"
         rbd_store_pool = images
         rbd_store_user = openstack
+        [image_import_opts]
+        image_import_plugins = ['image_conversion']
+        [image_conversion]
+        output_format = raw
 ```
 
 ## Configure Cinder
