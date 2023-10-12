@@ -39,8 +39,9 @@ spec:
 Only the services which are on the list will be configured.
 
 Because we need to deploy Ceph on an EDPM node after the storage
-network and NTP are configured but before Nova is configured, we edit
-the services list and make other changes to the CR accordingly.
+network and NTP are configured but before Nova is configured, we
+need to have two `OpenStackDataPlaneDeployments` each with their own
+`services` list.
 
 ## Configure the networks of the EDPM nodes
 
@@ -63,60 +64,6 @@ for an example to modify as described in this document.
 
 Do not yet create the CR in OpenShift as the edits described in the
 next sections are required.
-
-### Shorten the Service list
-
-Update the `services` list:
-
-- Add the `ceph-hci-pre` service before the `configure-os` service.
-- Remove any services after the `run-os` service for now.
-
-```yaml
-apiVersion: dataplane.openstack.org/v1beta1
-kind: OpenStackDataPlaneNodeSet
-spec:
-  ...
-  services:
-    - configure-network
-    - validate-network
-    - install-os
-    - ceph-hci-pre
-    - configure-os
-    - run-os
-```
-In the example above the services for `ovn`, `libvirt`, and `nova`
-have been removed. If there are other services besides the one in
-the list above, then remove them too but keep track of them as the
-full service list will need to be restored later.
-
-The `ceph-hci-pre` service prepares EDPM nodes to host Ceph services
-after the network has been configured. It does this by running the
-edpm-ansible role called `ceph-hci-pre`. This role injects a
-`ceph-networks.yaml` file into `/var/lib/edpm-config/firewall`
-so that when the `edpm_nftables` role runs, firewall ports are open
-for Ceph services. By default the `ceph-networks.yaml` file only
-contains directives to open the ports required by the Ceph RBD
-(block), RGW (object) and NFS (files) services. This is because of the
-following default Ansible variable value:
-```yaml
-edpm_ceph_hci_pre_enabled_services:
-  - ceph_mon
-  - ceph_mgr
-  - ceph_osd
-  - ceph_rgw
-  - ceph_nfs
-  - ceph_rgw_frontend
-  - ceph_nfs_frontend
-```
-If other Ceph services, like the Ceph Dashboard, will be deployed
-on HCI nodes, then add additional services to the enabled services
-list above. For more informatoin, see the `ceph-hci-pre` role in the
-[edpm-ansible role documentation](https://openstack-k8s-operators.github.io/edpm-ansible/roles.html).
-
-The `configure-os` and `run-os` services are run after `ceph-hci-pre`
-because they enable the firewall rules which `ceph-hci-pre` put in
-place. The `run-os` service also configures NTP, which is requried by
-Ceph.
 
 ### Add a Ceph cluster network
 
@@ -142,7 +89,7 @@ The example
 has both the `storage` and `storage_mgmt` networks since those EDPM
 nodes will host Ceph OSDs.
 
-Modify your DataPlaneNodeSet CR to set
+Modify your `OpenStackDataPlaneNodeSet` CR to set
 [edpm-ansible](https://github.com/openstack-k8s-operators/edpm-ansible)
 variables so that the
 [edpm_network_config role](https://github.com/openstack-k8s-operators/edpm-ansible/blob/main/roles/edpm_network_config/)
@@ -181,14 +128,71 @@ verify that all hosts using the network using jumbo frames can
 communicate at the desired MTU with a command like `ping -M do -s 8972
 172.20.0.100`.
 
-### Apply the CR
+### Create the OpenStackDataPlaneNodeSet
 
-Apply the CR. For example:
+Create the CR from your file based on the example
+[dataplane_v1beta1_openstackdataplanenodeset_ceph_hci.yaml](https://github.com/openstack-k8s-operators/dataplane-operator/blob/main/config/samples/dataplane_v1beta1_openstackdataplanenodeset_ceph_hci.yaml)
+with the changes described in the previous section.
+```
+oc create -f dataplane_cr.yaml
+```
 
-`oc apply -f dataplane_cr.yaml`
+### Create a pre-Ceph OpenStackDataPlaneDeployment
 
-When the CR is created Ansible will configure and validate the
-networks, including the storage networks.
+Creating an `OpenStackDataPlaneDeployment` will trigger Ansible jobs
+to configure an EDPM. Which Ansible roles are run depends on the
+`services` list.
+
+Each `OpenStackDataPlaneDeployment` can have its own
+`servicesOverride` list which will redefine the list
+of services of an `OpenStackDataPlaneNodeSet` for a
+deployment.
+
+The example
+[dataplane_v1beta1_openstackdataplanedeployment_pre_ceph_hci.yaml](https://github.com/openstack-k8s-operators/dataplane-operator/blob/main/config/samples/dataplane_v1beta1_openstackdataplanedeployment_pre_ceph_hci.yaml)
+has a shortened list of services which need to be configured
+before Ceph is deployed on an EDPM node in an HCI scenario.
+
+Create the CR based on the example
+```
+oc create -f openstackdataplanedeployment_pre_ceph_hci.yaml
+```
+
+#### Pre-Ceph Service Details
+
+The example
+[dataplane_v1beta1_openstackdataplanedeployment_pre_ceph_hci.yaml](https://github.com/openstack-k8s-operators/dataplane-operator/blob/main/config/samples/dataplane_v1beta1_openstackdataplanedeployment_pre_ceph_hci.yaml)
+contains the `ceph-hci-pre` service. This service
+prepares EDPM nodes to host Ceph services
+after the network has been configured. It does this by running the
+edpm-ansible role called `ceph-hci-pre`. This role injects a
+`ceph-networks.yaml` file into `/var/lib/edpm-config/firewall`
+so that when the `edpm_nftables` role runs, firewall ports are open
+for Ceph services. By default the `ceph-networks.yaml` file only
+contains directives to open the ports required by the Ceph RBD
+(block), RGW (object) and NFS (files) services. This is because of the
+following default Ansible variable value:
+```yaml
+edpm_ceph_hci_pre_enabled_services:
+  - ceph_mon
+  - ceph_mgr
+  - ceph_osd
+  - ceph_rgw
+  - ceph_nfs
+  - ceph_rgw_frontend
+  - ceph_nfs_frontend
+```
+If other Ceph services, like the Ceph Dashboard, will be deployed
+on HCI nodes, then add additional services to the enabled services
+list above. For more informatoin, see the `ceph-hci-pre` role in the
+[edpm-ansible role documentation](https://openstack-k8s-operators.github.io/edpm-ansible/roles.html).
+
+As seen in the example
+[dataplane_v1beta1_openstackdataplanedeployment_pre_ceph_hci.yaml](https://github.com/openstack-k8s-operators/dataplane-operator/blob/main/config/samples/dataplane_v1beta1_openstackdataplanedeployment_pre_ceph_hci.yaml),
+the `configure-os` and `run-os` services are run after `ceph-hci-pre`
+because they enable the firewall rules which `ceph-hci-pre` put in
+place. The `run-os` service also configures NTP, which is requried by
+Ceph.
 
 ### Confirm the Network is configured
 
@@ -408,42 +412,26 @@ spec:
         readOnly: true
 ```
 
-### Restore the full services list
+### Create a post-Ceph OpenStackDataPlaneDeployment
 
-Locate the `services` list in the CR. This list was shortened earlier
-to only configure services which Ceph needs (e.g. storage network,
-NTP, etc.) before Ceph was deployed. Now that Ceph has been deployed
-the full services list needs to be restored. For example:
+Create a second `OpenStackDataPlaneDeployment` which will trigger the
+Ansible jobs to complete the EDPM Compute node configuration.
 
-```yaml
-apiVersion: dataplane.openstack.org/v1beta1
-kind: OpenStackDataPlaneNodeSet
-spec:
-  ...
-  services:
-    - configure-network
-    - validate-network
-    - install-os
-    - configure-os
-    - ceph-hci-pre
-    - run-os
-    - ceph-client
-    - ovn
-    - libvirt
-    - nova-custom-ceph
-```
-In addition to restoring the default service list, the `ceph-client`
-service is added after `run-os`. The `ceph-client` service configures
-EDPM nodes as clients of a Ceph server by distributing the files,
-which Ceph clients use, which were made available as described in the
-"Add ExtraMounts" section of the document.
+The example
+[dataplane_v1beta1_openstackdataplanedeployment_post_ceph_hci.yaml](https://github.com/openstack-k8s-operators/dataplane-operator/blob/main/config/samples/dataplane_v1beta1_openstackdataplanedeployment_post_ceph_hci.yaml)
+has a shortened list of services which need to be configured
+after Ceph is deployed on an EDPM node in an HCI scenario.
 
-The above example uses the same custom OpenStackDataPlaneService
-called `nova-custom-ceph` as described in
-the [documentation to configure OpenStack to use Ceph](ceph.md)
-in place of the default `nova` OpenStackDataPlaneService. This
-custom service uses a ConfigMap called `ceph-nova` which ensures that
-the file `03-ceph-nova.conf` is is used by Nova.
+Before creating the deployment-post-ceph CR ensure that a
+custom `OpenStackDataPlaneService` called `nova-custom-ceph`
+has been created as described in
+the [documentation to configure OpenStack to use Ceph](ceph.md).
+The `nova-custom-ceph` can be seen in the
+[example](https://github.com/openstack-k8s-operators/dataplane-operator/blob/main/config/samples/dataplane_v1beta1_openstackdataplanedeployment_post_ceph_hci.yaml)
+and takes the place of the default `nova`
+OpenStackDataPlaneService. This custom service uses a ConfigMap called
+`ceph-nova` which ensures that the file `03-ceph-nova.conf` is is used
+by Nova.
 
 Create an additonal ConfigMap to set the `reserved_host_memory_mb`
 to a value appropriate for your system.
@@ -481,5 +469,13 @@ spec:
   - reserved-memory-nova
 ```
 
-When the `nova-custom-ceph` service Ansible job runs, it will copy
-overrides from the ConfigMaps onto the Nova hosts.
+Now that the `nova-custom-ceph` has been created, use the example
+[dataplane_v1beta1_openstackdataplanedeployment_post_ceph_hci.yaml](https://github.com/openstack-k8s-operators/dataplane-operator/blob/main/config/samples/dataplane_v1beta1_openstackdataplanedeployment_post_ceph_hci.yaml)
+to start the second deployment.
+
+```
+oc create -f openstackdataplanedeployment_pre_post_hci.yaml
+```
+
+The HCI deployment should be complete after the Ansible jobs started
+from creating the above CR finish successfully.
