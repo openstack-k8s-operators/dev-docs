@@ -45,6 +45,40 @@ oc patch csv -n openstack-operators <your operator CSV> --type json \
 oc patch csv -n openstack-operators <your operator CSV> --type=merge --patch-file=operator_csv.json
 ```
 
+### Finding the dataplane-operator in the CSV
+
+The dataplane-operator is
+[in the openstack operator bundle](https://github.com/openstack-k8s-operators/openstack-operator/commit/35d2a584fd890b13563160be2f19acbef98858ad)
+so it won't show up in the list all CSV objects.
+```
+$ oc get csv | grep dataplane | wc -l
+0
+$
+```
+Instead get the CSV of the openstack-operator.
+```
+$ oc get csv | grep openstack-operator
+openstack-operator.v0.0.1               OpenStack                      0.0.1                            Succeeded
+$
+```
+and use it to confirm it contains OpenStackDataPlane objects.
+```
+$ oc get csv openstack-operator.v0.0.1 -o json | jq .spec.customresourcedefinitions.owned | grep description | grep DataPlane
+    "description": "OpenStackDataPlaneDeployment is the Schema for the openstackdataplanedeployments API",
+    "description": "OpenStackDataPlaneNodeSet is the Schema for the openstackdataplanenodesets API",
+    "description": "OpenStackDataPlaneService is the Schema for the openstackdataplaneservices API",
+$
+```
+Thus, to scale down the dataplane-operator as described in the
+previous section, a command like this:
+```
+oc get csv -n openstack-operators <your operator CSV>
+```
+can be run like this:
+```
+oc get csv openstack-operator.v0.0.1
+```
+
 ## An Alternative Approach Provided by ChatGPT
 
 In Kubernetes, CSV (Cluster Service Version) is a Custom Resource Definition (CRD) that enables the operator to manage the lifecycle of a specific application in a Kubernetes cluster. The CSV defines the deployment strategy, dependencies, and upgrade paths for the application.
