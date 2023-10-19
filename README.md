@@ -8,6 +8,7 @@ Documentation related to podified controlplane.
 * [Quickstart on writing KUTTL tests for an operator](kuttl_tests.md)
 * [Building operator images](image_build.md)
 * [Debugging operator via vscode](debugging.md)
+* [Testing local changes to lib-common](testing_lib_common.md)
 * [Running a local copy of an operator for development without conflicts](running_local_operator.md)
 * [Webhooks usage](webhooks.md)
 * [Networking](networking.md)
