@@ -21,6 +21,19 @@ make catalog-build catalog-push
 
 Also check the operator-sdk quickstart at https://sdk.operatorframework.io/docs/building-operators/golang/quickstart/
 
+### OpenStack operator note for RHEL 8 non-root users
+
+_(As noted in the section title, this only seems to apply to non-root users on RHEL 8)_
+
+Building the OpenStack operator images locally requires `skopeo`, which itself must log into quay.io during its execution.  
+Thus this requires authentication.  By default, `skopeo` looks for login credentials in a location that may or may not currently 
+exist on your machine, and may or may not be accessible by non-root users even if it is present.  If `skopeo` can't access the
+location with your current user, the build process will fail.  To prevent this snag, it is recommended that you...
+```bash
+export REGISTRY_AUTH_FILE=<path to auth.json>
+```
+...to point `skopeo` to JSON login credentials for quay.io.  A typical location for this file is `/home/<your user>/.docker/config.json`.
+
 ## Creating images using github actions
 
 As part of the operators there is a [github action](https://github.com/openstack-k8s-operators/keystone-operator/blob/main/.github/workflows/build-keystone-operator.yaml) which builds and pushes the images to quay.io/openstack-k8s-operators.
