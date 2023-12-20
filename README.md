@@ -20,3 +20,4 @@ Documentation related to podified controlplane.
 * [Hyperconverged Infrastructure](hci.md)
 * [Service config and bootstrap](service_config.md)
 * [Overview of Writing EDPM services](edpm_service_overview.md)
+* [The journey of a config variable in openstack-k8s-operators](journey_of_a_config_variable.md)
