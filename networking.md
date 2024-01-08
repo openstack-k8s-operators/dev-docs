@@ -334,20 +334,20 @@ metadata:
   name: glance
 spec:
   ...
-  glanceAPIInternal:
-    ...
-    override:
-      service:
-        metadata:
-          annotations:
-            metallb.universe.tf/address-pool: internalapi
-            metallb.universe.tf/allow-shared-ip: internalapi
-            metallb.universe.tf/loadBalancerIPs: 172.17.0.80
-          labels:
-            service: glance
-        spec:
-          type: LoadBalancer
-    ...
+  glanceAPIs:
+    default:
+      ...
+      override:
+        service:
+          internal:
+            metadata:
+              annotations:
+                metallb.universe.tf/address-pool: internalapi
+                metallb.universe.tf/allow-shared-ip: internalapi
+                metallb.universe.tf/loadBalancerIPs: 172.17.0.80
+            spec:
+              type: LoadBalancer
+      ...
 ...
 ```
 
@@ -383,22 +383,18 @@ metadata:
   name: glance
 spec:
   ...
-  glanceAPIInternal:
-    ...
-    networkAttachents:
-    - storage
-  glanceAPIExternal:
-    ...
-    networkAttachents:
-    - storage
+  glanceAPIs:
+    default:
+      ...
+      networkAttachents:
+      - storage
 ...
 ```
 
 When the service is up and running, it will now have an additional nic configured for the storage network:
 
 ```
-# oc rsh glance-external-api-dfb69b98d-mbw42
-Defaulted container "glance-api" out of: glance-api, init (init)
+# oc rsh -c glance-api glance-default-external-0
 sh-5.1# ip a
 1: lo: <LOOPBACK,UP,LOWER_UP> mtu 65536 qdisc noqueue state UNKNOWN group default qlen 1000
     link/loopback 00:00:00:00:00:00 brd 00:00:00:00:00:00
