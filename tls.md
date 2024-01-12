@@ -88,7 +88,7 @@ This bundle can be used to be direct mounted into a deployment to the environmen
 
 ### TLS internal communication
 
-Each service operator creates for its APIs one or multiple k8s services. If in the `OpenStackControlPlane` CR gets configured to have tls for internal endpoints enabled:
+Each service operator creates one or multiple k8s services for its APIs. If in the `OpenStackControlPlane` CR is configured to have tls for internal endpoints enabled:
 
 ```yaml
 apiVersion: core.openstack.org/v1beta1
