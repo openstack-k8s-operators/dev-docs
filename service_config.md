@@ -15,6 +15,9 @@ converge or diverge according to a given operator, the number of deployed
 services, and other potential requirements that are not the same across the
 board.
 
+The document doesn't apply to services that do not use `oslo.config` INI-like
+configuration files (or even *any* configuration files), for example, OVN.
+
 
 ## Proposed approach
 
