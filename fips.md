@@ -66,7 +66,7 @@ As mentioned earlier, the proposed change is based on:
    libraries, including OpenSSL
 
 
-## CI - Check FIPS compliance 
+## CI - Check FIPS compliance
 
 The [check-payload tool](https://github.com/openshift/check-payload) can be used
 to verify if an operator image is FIPS compliant.
@@ -82,6 +82,25 @@ repository and add:
 export FAIL_FIPS_CHECK=true
 ```
 
+
+## Feature reporting
+
+Once an operator and its image are built in a FIPS compliant way, as described
+above, and the operator is also honoring the OpenShift Cluster FIPS mode when
+deploying its OpenStack services, the operator can announce that is fully FIPS
+compliant using an OpenShift specific annotation, as [described in the
+OpenShift docs](https://docs.openshift.com/container-platform/4.14/operators/operator_sdk/osdk-generating-csvs.html#osdk-csv-annotations-infra_osdk-generating-csvs).
+
+This means editing the operator's `ClusterServiceVersion` object, for example
+in cinder it's in the
+`config/manifests/bases/cinder-operator.clusterserviceversion.yaml` file, and
+setting the annotation:
+
+```yaml
+metadata:
+  annotations:
+    features.operators.openshift.io/fips-compliant: "true"
+```
 
 ## Resources
 
