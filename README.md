@@ -23,3 +23,4 @@ Documentation related to podified controlplane.
 * [Overview of Writing EDPM services](edpm_service_overview.md)
 * [The journey of a config variable in openstack-k8s-operators](journey_of_a_config_variable.md)
 * [Troubleshooting](troubleshooting.md)
+* [FIPS](fips.md)
