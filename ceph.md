@@ -400,7 +400,7 @@ spec:
                     cephfs_protocol_helper_type=CEPHFS
 ```
 
-## Configure Swift with a RGW backend
+## Configuring Ceph Object Store to use external Ceph Object Gateway
 
 It's possible to configure an external Ceph Object Gateway (RGW) as an Object
 Store service. Users can rely on the `Swift` client tool to interact with the
