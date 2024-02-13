@@ -29,10 +29,10 @@ spec:
         enabled: false
       public:
         enabled: true
-    caSecretName: myAdditionalCACerts
+    caBundleSecretName: myAdditionalCACerts
 ```
 
-Using the `caSecretName` parameter a secret can be referenced containing any additional CA certificates, which should be added to the CA bundle.
+Using the `caBundleSecretName` parameter a secret can be referenced containing any additional CA certificates, which should be added to the CA bundle.
 
 ### TLS public endpoints
 
@@ -71,7 +71,7 @@ spec:
 The `openstack-operator` creates a combindes CA bundle, stored in a secret named `combined-ca-bundle`. This bundle will have:
 * all default CAs from the operator image itself (system CAs)
 * the CAs created by the `openstack-operator`
-* any 3rd party CA provided via the `tls.caSecretName`
+* any 3rd party CA provided via the `tls.caBundleSecretName`
 * CAs provided via the `apiOverride.tls.secretName`
 
 Note: The CA probided via the `apiOverride.route` is right now *not* added to the CA bundle.
@@ -88,4 +88,58 @@ This bundle can be used to be direct mounted into a deployment to the environmen
 
 ### TLS internal communication
 
-TBD
+Each service operator creates one or multiple k8s services for its APIs. If in the `OpenStackControlPlane` CR is configured to have tls for internal endpoints enabled:
+
+```yaml
+apiVersion: core.openstack.org/v1beta1
+kind: OpenStackControlPlane
+metadata:
+  name: myctlplane
+spec:
+  tls:
+    endpoint:
+      internal:
+        enabled: true
+      ...
+```
+
+Most of the deployments use k8s service as a single entry to access the service pods, but there might some which don't. In general TLS termination happens at the pod level.
+
+#### Deployments using k8s services
+
+The configuration of the service is reflecting the k8s service name, not the individual pod name. With this all pods in a scaling resource will share the same service certificate. 
+
+For each of the k8s services the openstack-operator requests a certificate for the hostname <service>.<namespace>.svc using the internal and the public `CertManager` issuer. For each cert request, CertManger will create a secret holding a `tls.crt`, `tls.key` and `ca.crt`. Those secrets, certificate and the combined CA bundle described above, can be passed into the service operators CRD using the tls section.
+
+Public/internal API services:
+```yaml
+  tls:
+    api:
+      # secret holding tls.crt and tls.key for the APIs internal k8s service
+      internal:
+        secretName: cert-internal-svc
+      # secret holding tls.crt and tls.key for the APIs public k8s service
+      public:
+        secretName: cert-public-svc
+    # secret holding the tls-ca-bundle.pem to be used as a deploymend env CA bundle
+    caBundleSecretName: combined-ca-bundle
+```
+
+Single, not endpoint specific service:
+```yaml
+  tls:
+    caBundleSecretName: combined-ca-bundle
+    secretName: cert-nova-novncproxy-cell1-public-svc
+```
+
+As mentioned above, the CA bundle will be mounted as the global CA bundle for the deployment container. The service secrets will be used for the service providing the api. Depending on how the service gets started (using kolla or not), the cert and key get either mounted to a directory and using kolla to put into its final place, or direct mounted to where the service expects it.
+
+For k8s service a virtual host gets configured using the service name with its corresponding certificate.
+
+Like with other config secrets/config maps a hash gets used to identify if the certificate changed and the deployment pod has to be restarted. For this, the service operators index the named secret fields to be able to watch those if they change. If a change happenes which result in a hash change, the default action is to restart the deployment. There might be services which will handle this different.
+
+If internal tls is enabled, using `spec.tls.endpoint.internal.enabled: true`, routes get configured with `spec.tls.termination: reencrypt` and CA added to `spec.tls.destinationCACertificate` to be able to validate the certificate of the k8s service.
+
+#### Deployments not using k8s services
+
+TBD when e.g. ovn got added
