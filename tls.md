@@ -24,15 +24,45 @@ metadata:
   name: myctlplane
 spec:
   tls:
-    endpoint:
-      internal:
-        enabled: false
-      public:
-        enabled: true
+    ingress:
+      enabled: true
+    podLevel:
+      enabled: false
     caBundleSecretName: myAdditionalCACerts
 ```
 
 Using the `caBundleSecretName` parameter a secret can be referenced containing any additional CA certificates, which should be added to the CA bundle.
+
+The openstack-operator creates CAs for its different usage.
+* rootca-public - used to issue certificates for routes and k8s services for public endpoint httpd vhost configuration
+* rootca-internal - used to issue certificates for all internal communication, like internal endpoint httpd vhost config, database, rabbitmq ..., except of the bellow special use case CAs
+* rootca-ovn - used to issue certificates for ovn/ovs
+
+Per default CA certificates are valid for 5 and service certificates for 1 year. This can be customized using the `duration` and `renewBefore` parameters for CA and certificate, e.g.:
+
+```yaml
+  tls:
+    ingress:
+      ca:
+        duration: 43800h
+      cert:
+        duration: 5000h
+        renewBefore: 100h
+      enabled: true
+    podLevel:
+      enabled: true
+      internal:
+        ca:
+          duration: 43800h
+        cert:
+          duration: 5000h
+          renewBefore: 200h
+      ovn:
+        ca:
+          duration: 83800h
+        cert:
+          duration: 5000h
+```
 
 ### TLS public endpoints
 
@@ -97,10 +127,10 @@ metadata:
   name: myctlplane
 spec:
   tls:
-    endpoint:
-      internal:
-        enabled: true
-      ...
+    ...
+    podLevel:
+      enabled: true
+    ...
 ```
 
 Most of the deployments use k8s service as a single entry to access the service pods, but there might some which don't. In general TLS termination happens at the pod level.
