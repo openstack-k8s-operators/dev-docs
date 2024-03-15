@@ -9,11 +9,14 @@ Description of conditions https://github.com/kubernetes/community/blob/master/co
 ## Conditions in openstack-k8s-operators podified controlplane operators
 * At the beginning of the reconciliation loop, controller adds a `Ready` condition which reflects the overall state of the service with `Status=Unknown`
 * When a controller performs a task, before it starts a step condition gets initialized to `Status=Unknown` e.g. DBReady, DBSync, Endpoint, ServiceRegistered, …
+* Conditions should always be re-initialized at the beginning of each reconcile. This is to ensure that changes to the spec
+  will reset conditions accordingly.
 * At the end of the reconcile loop the overall `Ready` condition gets set to `Status=True/False`, depending if the sub task conditions are fulfilled or not.
-* The service `Ready` condition with `Status=True` reflects that the service is configured, up and accessible.
-* If the `Ready` condition is `Status=False` or `Unknown` the service is not OK to answer requests
-  - `Status=False` indicates an Error that needs user intervention to fix it
-  - `Status=Unknown` indicates that the operator can progress without user intervention. i.e the operator is waiting for a job to complete
+* The Ready condition on our CRDs reflect that the expected state described by the Spec field of the CRD is the same as the actual state of the system, i.e. the operator finished reconciling the state of the system according to the Spec.
+* If the `Ready` condition is `Status=False` or `Unknown` the service has not been deployed with the currently configured spec.
+  - `Status=False` indicates that a condition has not yet been met.
+* It is acceptable to set ReadyCondition=True if replicas is 0. Any checks for an active service is actually running should
+  check that both replicas is >0 and ReadyCondition=True.
 
 ## Controllers and conditions
 General behavior of a controller to consume/set conditions:
@@ -36,7 +39,7 @@ This does not reflect a complete list of condition types, it is just to illustra
 
 | Condition Type | Description |
 | --- | --- |
-| `ReadyCondition` | All APIs have at least one `ReadyCondition` condition type that summarizes the overall operational state of the API object. Each CRD has a `IsReady()` method which returns a bool of the status of the instance/Ready condition https://github.com/openstack-k8s-operators/keystone-operator/blob/82267e337f6a24ac86987be0c13275b22a838d6b/api/v1beta1/keystoneapi_types.go#L221 |
+| `ReadyCondition` | All APIs have at least one `ReadyCondition` condition type that summarizes the overall operational state of the API object. Each CRD has a `IsReady()` method which returns a bool of the status of the instance/Ready condition https://github.com/openstack-k8s-operators/keystone-operator/blob/82267e337f6a24ac86987be0c13275b22a838d6b/api/v1beta1/keystoneapi\_types.go#L221 |
 | `InputReadyCondition` | Condition which indicates if all required input sources are available, like e.g. secret holding passwords, other config maps providing input for the service. |
 | `ServiceConfigReadyCondition` | Condition which indicates that all service config got rendered ok from the templates and stored in the ConfigMap |
 | `DBReadyCondition` | This condition is mirrored from the `Ready` condition in the `mariadbdatabase` ref object to the service API. |
