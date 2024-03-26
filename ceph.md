@@ -193,24 +193,9 @@ to access the Ceph client files, they are stored in
 
 ## Configure Glance
 
-When Glance is configured with Ceph it's recommended to enable
-[image conversion](https://github.com/openstack-k8s-operators/glance-operator/tree/main/config/samples/import_plugins).
-
-Create a PVC to host a staging area using the example
-[image_conversion_pvc.yaml](https://github.com/openstack-k8s-operators/glance-operator/blob/main/config/samples/import_plugins/image_conversion/image_conversion_pvc.yaml)
-from the glance-operator repository.
-```
-oc create -f image_conversion_pvc.yaml
-```
-Change the storage size of the requested PVC to be as large as the largest
-expected image after it has been converted into RAW format with a command
-like `qemu-img convert -f qcow2 -O raw cirros.img cirros.raw`. When an image
-is uploaded, Glance will use this space to convert it to RAW so that Ceph
-can create volumes and VMs from the image efficiently using COW references.
-
-Use a `customServiceConfig` to pass overrides to Glance's
-configuration file. For example, the sample
-[core_v1beta1_openstackcontrolplane_network_isolation_ceph.yaml](https://github.com/openstack-k8s-operators/openstack-operator/blob/main/config/samples/core_v1beta1_openstackcontrolplane_network_isolation_ceph.yaml)
+To configure Glance to use Ceph RBD use a `customServiceConfig` to
+pass overrides to Glance's configuration file. For example, the sample
+[core_v1beta1_openstackcontrolplane_network_isolation_ceph.yaml](https://github.com/openstack-k8s-operators/openstack-operator/blob/main/config/samples/core_v1beta1_openstackcontrolplane_network_isolation_ceph.yam)
 has the following in the `OpenStackControlPlane` CR:
 
 ```yaml
@@ -233,11 +218,15 @@ spec:
         store_description = "RBD backend"
         rbd_store_pool = images
         rbd_store_user = openstack
-        [image_import_opts]
-        image_import_plugins = ['image_conversion']
-        [image_conversion]
-        output_format = raw
 ```
+
+Whenever Glance is configured to use Ceph as a backend the Glance
+operator will configure image conversion so that if an image is
+uploaed on qcow2 format, then it will automatically be converted
+into raw format before it is stored in Ceph. This allows Ceph to
+create volumes and VMs from the image efficiently using COW
+references. For more information see the
+[Glance Operator import plugin documentation](https://github.com/openstack-k8s-operators/glance-operator/tree/main/config/samples/import_plugins).
 
 ## Configure Cinder
 
