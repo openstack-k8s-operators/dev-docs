@@ -1,5 +1,84 @@
 # Troubleshooting guide
 
+## OpenStackControlPlane is not Ready
+
+If the status of the Ready condition of OpenStackControlPlane CR is not True
+then the control plane not deployed correctly and you will see a message
+indicating which part of the control plane is the source of the problem.
+
+\# TODO: change the example to show a real error
+```sh
+oc get -n openstack OpenStackControlPlane \
+  -o jsonpath="{.items[0].status.conditions[?(@.type=='Ready')]}" \
+  | jq
+{
+  "lastTransitionTime": "2024-04-05T07:56:53Z",
+  "message": "Setup complete",
+  "reason": "Ready",
+  "status": "True",
+  "type": "Ready"
+}
+```
+
+Alternatively you can check all the conditions that are not reporting True
+status.
+
+```sh
+oc get -n openstack OpenStackControlPlane \
+  -o jsonpath="{range .items[0].status.conditions[?(@.status!='True')]}{.type} is {.status} due to {.message}{'\n'}{end}"
+```
+
+If you identified a specific service causing the issue then you can check the
+status of the related CR. E.g. If the OpenStackControlPlane reports False for
+OpenStackControlPlaneNovaReady condition then you need to check the status
+of the Nova CR.
+
+```sh
+oc get -n openstack Nova/nova \
+  -o jsonpath="{range .status.conditions[?(@.status!='True')]}{.type} is {.status} due to {.message}{'\n'}{end}"
+```
+
+You can also check the status of the operators
+```sh
+oc get pods -n openstack-operators -lopenstack.org/operator-name
+NAME                                                              READY   STATUS    RESTARTS   AGE
+barbican-operator-controller-manager-845b85cc46-lnxqp             2/2     Running   0          2d
+cinder-operator-controller-manager-74c9cf8947-2v25m               2/2     Running   0          2d
+...
+```
+the logs of the operators
+```sh
+oc logs -n openstack-operators -lopenstack.org/operator-name=nova
+```
+and the status and logs of the deployed openstack services
+```sh
+oc get pods -n openstack
+```
+```sh
+oc logs -n openstack nova-api-0
+```
+
+
+## OpenStackDataPlaneDeployment is not Ready
+
+You can check the status of the OpenStackDataPlaneDeployment and NodeSet CRs
+```sh
+oc get -n openstack OpenStackDataPlaneDeployment
+NAME                   NODESETS                  STATUS   MESSAGE
+edpm-deployment-ipam   ["openstack-edpm-ipam"]   False    Deployment error occurred nodeSet: openstack-edpm-ipam error: execution.name telemetry-edpm-deployment-ipam-openstack-edpm-ipam Execution.namespace openstack Execution.status.jobstatus: Failed
+```
+```sh
+oc get -n openstack OpenStackDataPlaneNodeSet
+NAME                  STATUS   MESSAGE
+openstack-edpm-ipam   False    Deployment error occurred check deploymentStatuses for more details
+
+```
+The output will tell you which ansible executing job is failed, then you can
+check the logs of that job.
+```sh
+oc logs -n openstack job/telemetry-edpm-deployment-ipam-openstack-edpm-ipam
+```
+
 ## Crashing Pods
 
 Certain problems in the deployment can cause Pods to crash and terminate
@@ -47,9 +126,9 @@ The [Ceph integration documentation](ceph.md) describes using
 `ExtraMounts` to place files like `ceph.client.openstack.keyring`
 and `ceph.conf` in `/etc/ceph` in each pod which needs to connect
 to Ceph. Connect to the pod with `oc rsh` and ensure that both of
-these files are present. 
+these files are present.
 
-If the Ceph files are missing, check the syntax of 
+If the Ceph files are missing, check the syntax of
 the `ExtraMounts` section of the spec in the `OpenStackControlPlane`.
 
 2. Confirm the pod can reach the Ceph cluster
@@ -61,7 +140,7 @@ ports of the Ceph cluster's monitors should be in
 IP as well as connect to the port.
 ```
 $ oc rsh -c glance-api glance-default-external-api-0
-bash-5.1$ cat /etc/ceph/ceph.conf 
+bash-5.1$ cat /etc/ceph/ceph.conf
 # minimal ceph.conf for 7fbaf2fd-f70e-5625-b00e-65b33ee823a6
 [global]
 	fsid = 7fbaf2fd-f70e-5625-b00e-65b33ee823a6
@@ -105,7 +184,7 @@ are present as described in step 1.
 Once connected to the NovaAPI pod with `oc rsh` examine the cephx key.
 
 ```
-bash-5.1$ cat /etc/ceph/ceph.client.openstack.keyring 
+bash-5.1$ cat /etc/ceph/ceph.client.openstack.keyring
 [client.openstack]
    key = "<redacted>"
    caps mgr = allow *
@@ -118,7 +197,7 @@ the list of OSD caps. Try to list the contexts of that pool with the
 RBD command.
 ```
 /usr/bin/rbd --conf /etc/ceph/ceph.conf \
-             --keyring /etc/ceph/ceph.client.openstack.keyring 
+             --keyring /etc/ceph/ceph.client.openstack.keyring
              --cluster ceph --id openstack
              ls -l -p images | wc -l
 ```
@@ -150,11 +229,11 @@ below.
 # DATA=$(date | md5sum | cut -c-12)
 # POOL=images
 # RBD="/usr/bin/rbd --conf /etc/ceph/ceph.conf --keyring /etc/ceph/ceph.client.openstack.keyring --cluster ceph --id openstack"
-# $RBD create --size 1024 $POOL/$DATA 
+# $RBD create --size 1024 $POOL/$DATA
 ^C
-# 
+#
 ```
-If the above had succeeded, then the test data could be deleted with 
+If the above had succeeded, then the test data could be deleted with
 `$RBD rm $POOL/$DATA`.
 
 In the example above the `rbd` command hung and was canceled. It was
