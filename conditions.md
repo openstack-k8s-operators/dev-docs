@@ -1,8 +1,8 @@
 # Conditions
-This doc describes how condiditons should be used in operators managing a podified controlplane (**NOT** osp-director-operator).
+This doc describes how conditions should be used in operators managing a podified controlplane (**NOT** osp-director-operator).
 
 ## General information
-Description of conditions https://github.com/kubernetes/community/blob/master/contributors/devel/sig-architecture/api-conventions.md#typical-status-properties 
+Description of conditions https://github.com/kubernetes/community/blob/master/contributors/devel/sig-architecture/api-conventions.md#typical-status-properties
 
 **Note**: While it might be useful/easier to manage conditions in a map (easier to access/set) instead of a list, conditions are represented using a list/slice of objects, where each condition has a similar structure. This collection should be treated as a map with a key of type.
 
