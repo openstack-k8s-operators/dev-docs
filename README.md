@@ -3,6 +3,7 @@ Developer Documentation related to podified controlplane.
 
 * [Quickstart guide to start a new operator](new_operator.md)
 * [Conditions usage](conditions.md)
+* [Observed generation](observed_generation.md)
 * [Common issues](common_issues.md)
 * [Implementation Guidelines](developer.md)
 * [Quickstart on writing KUTTL tests for an operator](kuttl_tests.md)
