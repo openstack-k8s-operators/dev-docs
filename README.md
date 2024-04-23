@@ -13,6 +13,7 @@ Developer Documentation related to podified controlplane.
 * [Running a local copy of an operator for development without conflicts](running_local_operator.md)
 * [Webhooks usage](webhooks.md)
 * [Networking](networking.md)
+* [OVS Update](ovs-update.md)
 * [TLS](tls.md)
 * [Operator controller manager pod labels](operator_controller_labels.md)
 * [Testing operators with EnvTest](envtest.md)
