@@ -1,10 +1,12 @@
 # TLS
 
+Certificate management within the openstack-operator is by default done using [cert-manager](https://cert-manager.io/docs/). For each component the openstack-operator creates one or multiple certificates and pass the name/names of the k8s secret, which contains the certificate, key and ca certificate, to the service component. By default cert-manager does not delete k8s secrets, holding the certificate information, when the cert-manager certificate resource gets deleted. Consult the OpenShift documentation on [Deleting a TLS secret automatically upon Certificate removal](https://docs.openshift.com/container-platform/4.14/security/cert_manager_operator/cert-manager-customizing-api-fields.html#cert-manager-override-flag-controller_cert-manager-customizing-api-fields).
+
 In the context of TLS (Transport Layer Security) configuration within the OpenStackControlPlane, two primary levels of traffic encryption are distinguished: `ingress` and `podLevel`:
 * `ingress` refers to the public (external) traffic that enters the cluster via a route
 * `podLevel` refers to the internal traffic within the cluster, specifically, the communication between pods, services and edpm nodes.
 
-TLS is enabled per default for both `ingress` and `podLevel` communication.
+TLS is enabled by default for both `ingress` and `podLevel` communication.
 
 ## Endpoint Termination overview
 In terms of how traffic is managed within the cluster:
@@ -42,8 +44,9 @@ By default, the openstack-operator provisions the following CAs via cert-manager
 * rootca-public - used to issue certificates for routes and k8s services for public endpoint httpd vhost configuration.
 * rootca-internal - used to issue certificates for all internal communication, like internal endpoint httpd vhost config, database, rabbitmq ..., except of the bellow special use case CAs.
 * rootca-ovn - used to issue certificates for ovn/ovs services specifically.
+* rootca-libvirt - used to issue certificates for libvirt/qemu services specifically.
 
-Per default CA certificates are valid for 5 years and service certificates for 1 year. This can be customized using the `duration` and `renewBefore` parameters for CA and certificates, e.g.:
+By default CA certificates are valid for 5 years and service certificates for 1 year. This can be customized using the `duration` and `renewBefore` parameters for CA and certificates, e.g.:
 
 ```yaml
 spec:
@@ -63,6 +66,11 @@ spec:
         cert:
           duration: 5000h
           renewBefore: 200h
+      libvirt:
+        ca:
+          duration: 83800h
+        cert:
+          duration: 5000h
       ovn:
         ca:
           duration: 83800h
