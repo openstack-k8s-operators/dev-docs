@@ -92,9 +92,20 @@ The secret also has a default label which can be used to query:
     combined-ca-bundle: ""
 ```
 
-Using the `caBundleSecretName` parameter a secret can be referenced containing any additional CA certificates, which should be added to the CA bundle.
+Using the global `caBundleSecretName` parameter a secret can be referenced containing any additional CA certificates, which should be added to the combined CA bundle:
 
-Whenever `openstack-operator` reconciles it will check for expired or new CA certs to be added to the bundle. Not expired CAs will be kept in the secret if they are not yet expired, even if they got removed from the source it was originally taken from. This allows to rotate certs for a service using a new CA.
+```yaml
+apiVersion: core.openstack.org/v1beta1
+kind: OpenStackControlPlane
+metadata:
+  name: myctlplane
+spec:
+  ...
+  tls:
+    caBundleSecretName: mycasecret
+```
+
+Multiple entries are allowed in one secret. Whenever `openstack-operator` reconciles it will check for expired or new CA certs to be added to the bundle. Not expired CAs will be kept in the secret if they are not yet expired, even if they got removed from the source it was originally taken from. This allows to rotate certs for a service using a new CA.
 
 Note: The CA provided via the `apiOverride.route` is right now *not* added to the CA bundle.
 
@@ -226,4 +237,25 @@ TBD when e.g. ovn got added
 
 ## Testing Scenarios
 
-TBD
+The kuttl test scenarios aim to cover the functionality of TLS within a cluster environment. General guidelines for writing a kuttl test for an operator are available in [this section](https://github.com/openstack-k8s-operators/dev-docs/blob/main/kuttl_tests.md).
+
+### In openstack-operator
+
+The tests for general TLS functions are implemented in the [openstack-operator](https://github.com/openstack-k8s-operators/openstack-operator/tree/main/tests/kuttl). Currently, the following scenarios are implemented:
+* **Custom Internal Issuer**
+  * Deploy with the default internal issuer, then switch to a custom internal issuer.
+  * Deploy with the custom internal issuer, then switch to a default internal issuer.
+* **Custom Ingress Issuer**
+  * Deploy with the default ingress issuer, then switch to a custom ingress issuer.
+  * Deploy with the custom ingress issuer, then switch to a default ingress issuer.
+* **Service Certificate Rotation**
+  * After deployment, certificate secrets are deleted, triggering service restarts. The test checks whether new secrets are mounted in service pods and if route configurations use these new secrets.
+* **Custom CA cert added to a bundle**
+  * Test whether a custom CA certificate provided via the `caBundleSecretName` is added to the `combined-ca-bundle`.
+* **Customize cert and CA cert duration parameters**
+  * New durations are set to `500h0m0s` for the service certificates and `1000h0m0s` for the CA certificates.
+
+**Note**: To triggert certificate recreation, secrets should not be deleted, this method was used for testing purposes only. Learn more about triggering renewal in the [cert-manager ctml documentation](https://cert-manager.io/docs/reference/cmctl/#renew).
+
+### In Service Operators
+Each service operator implements its own kuttl tests, which can vary based on the specific operator and the [type of TLS service](#tls-common-package) each uses. Generally, the TLS kuttl tests cover the successful creation of volumes and volume mounts that hold the `combined-ca-bundle`, public, and internal certificates, ensuring the correct setup if the HTTPS scheme is used, etc. To facilitate kuttl testing, hardcoded certificate secrets are used, meaning kuttl does not require cert-manager at test runtime.
