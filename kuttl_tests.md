@@ -16,7 +16,7 @@ What should be tested for in a kuttl suite depends on the details of the
 operator itself. A good place to find more information is the controller.go
 file for the operator, there you should find
 hints on what resources does the operator create and/or manage. Another source
-of information s the operator API where it list which attributes the operator 
+of information s the operator API where it list which attributes the operator
 exposes. As an example, in keystone, one can find [here](https://github.com/openstack-k8s-operators/keystone-operator/blob/main/api/bases/keystone.openstack.org_keystoneapis.yaml) the properties of the API. Another good option would be to contact the people
 listed as approvers in the operator's `OWNERS` file. Below are some example of
 things to assert while writing the tests (they might not apply to all operators):
@@ -48,7 +48,7 @@ Below are some things to keep in mind while writing kuttl tests:
 
 * Scripting can be used in assert files (useful if for example want to check some
 parameter using regex, since that is not supported by kuttl). As
-mentioned in the [kuttl docs](https://kuttl.dev/docs/testing/steps.html#shell-scripts), 
+mentioned in the [kuttl docs](https://kuttl.dev/docs/testing/steps.html#shell-scripts),
 the scripts used in an assert are passed to `sh -c`  to be
 run, so the result can be environment dependent. For example, `sh` is often
 symlinked to `bash`, but in many environments this will not be true, so be
@@ -68,3 +68,36 @@ kubectl-kuttl assert --namespace openstack /path/to/02-assert.yaml --timeout 10.
 Note that the assert command does not support having TestAssert blocks in the assert files (https://github.com/kudobuilder/kuttl/issues/221).
 
 * There is also an `errors` command to debug errors files.
+
+
+Tips and common mistakes
+========================
+
+* In a test step file you can create, update, delete multiple resources just
+separate them with `---`.
+
+* If you update an existing resource in a test step file you only need to
+provide the fields that you want to change, kuttl will merge patch the existing
+resource.
+
+* You can use the TestStep in a test step file to execute a script to do
+complex changes in the cluster. However TestSteps and other resource
+definitions within the same test step file is applied in an random order by
+kuttl. If you need a well defined sequence of steps then you need to use
+separate step files with increasing indexes.
+
+* In an assert file you can match multiple resources, just separate them with
+`---`.
+
+* The expected resource state in an assert file does not have to list all the
+fields of the resource type. The fields that are not listed in the assert file
+will be ignored during matching with the real resource. This way you can assert
+only the fields relevant to the given test case.
+
+* You can use the TestAssert resource in an assert or error file to run
+shell scripts to assert complex things. However only a single TestAssert can
+be used per file. If you add multiple TestAsserts then only the last one will
+be executed and the rest is ignored by kuttl.
+
+* If you use scripts in TestStep or TestAssert then add `set -euxo pipefail`
+to the start of the script to ensure that no error is ignored.
