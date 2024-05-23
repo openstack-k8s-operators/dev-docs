@@ -46,7 +46,7 @@ By default, the openstack-operator provisions the following CAs via cert-manager
 * rootca-ovn - used to issue certificates for ovn/ovs services specifically.
 * rootca-libvirt - used to issue certificates for libvirt/qemu services specifically.
 
-By default CA certificates are valid for 5 years and service certificates for 1 year. This can be customized using the `duration` and `renewBefore` parameters for CA and certificates, e.g.:
+By default CA certificates are valid for 10 years and service certificates for 5. This can be customized using the `duration` and `renewBefore` parameters for CA and certificates, e.g.:
 
 ```yaml
 spec:
