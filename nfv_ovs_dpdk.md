@@ -42,7 +42,7 @@ spec:
     - neutron-ovn
     - neutron-metadata
     - libvirt
-    - nova-custom-ovsdpdk
+    - nova-custom-ovs-dpdk
 ```
 Only the services which are on the list will be configured.
 
@@ -171,24 +171,24 @@ by adding it to the `configMaps` list.
 apiVersion: dataplane.openstack.org/v1beta1
 kind: OpenStackDataPlaneService
 metadata:
-  name: nova-custom-ovsdpdk
+  name: nova-custom-ovs-dpdk
 spec:
-  label: dataplane-deployment-nova-custom-ovsdpdk
+  label: dataplane-deployment-nova-custom-ovs-dpdk
   configMaps:
     - ovs-dpdk-cpu-pinning-nova
   secrets:
     - nova-cell1-compute-config
   playbook: osp.edpm.nova
 ```
-The custom service is named `nova-custom-ovsdpdk`. It cannot be named
+The custom service is named `nova-custom-ovs-dpdk`. It cannot be named
 `nova` because `nova` is an immutable default service and will
 overwrite any custom service with the same name during reconciliation.
 
 After the `ConfigMap` and `OpenStackDataPlaneService` services above
-have been created (e.g. `oc create -f nova-custom-ovsdpdk.yaml`), update the
+have been created (e.g. `oc create -f nova-custom-ovs-dpdk.yaml`), update the
 `OpenStackDataPlaneNodeSet`
-[EDPM services list](https://openstack-k8s-operators.github.io/openstack-operator/dataplane/#_composable_services)
-to replace the `nova` service with `nova-custom-ovsdpdk`.
+[EDPM services list](https://openstack-k8s-operators.github.io/dataplane-operator/composable_services)
+to replace the `nova` service with `nova-custom-ovs-dpdk`.
 
 ```yaml
 apiVersion: dataplane.openstack.org/v1beta1
@@ -214,13 +214,13 @@ spec:
         - neutron-ovn
         - neutron-metadata
         - libvirt
-        - nova-custom-ovsdpdk
+        - nova-custom-ovs-dpdk
 ```
 The `bootstrap`, `configure-ovs-dpdk` and `configure-network` services
-should be added before the `libvirt` and `nova` (or `nova-custom-ovsdpdk`
+should be added before the `libvirt` and `nova` (or `nova-custom-ovs-dpdk`
 in this case) services. It configures EDPM nodes with ovs dpdk.
 
-When the `nova-custom-ovsdpdk` service Ansible job runs, it will copy
+When the `nova-custom-ovs-dpdk` service Ansible job runs, it will copy
 overrides from the `ConfigMap`s onto the Nova hosts.
 
 ### Create the OpenStackDataPlaneNodeSet
@@ -251,19 +251,19 @@ Create the CR based on the example
 oc kustomize --load-restrictor LoadRestrictionsNone openstack-operator/config/samples/dataplaneovs_dpdk > dataplane_cr.yaml
 ```
 
-Custom `OpenStackDataPlaneService` called `nova-custom-ovsdpdk`
+Custom `OpenStackDataPlaneService` called `nova-custom-ovs-dpdk`
 has been created as described in
 the [documentation to configure OpenStack to use OVS DPDK](ovs_dpdk.md).
-The `nova-custom-dpdk` can be seen in the
-[example](https://github.com/openstack-k8s-operators/openstack-operator/tree/main/config/samples/dataplane/ovs_dpdk)
+The `nova-custom-ovs-dpdk` can be seen in the
+[example](https://github.com/openstack-k8s-operators/dataplane-operator/tree/main/examples/ovs_dpdk)
 and takes the place of the default `nova`
 OpenStackDataPlaneService. This custom service uses a `ConfigMap` called
-`cpu-pinning-nova` which ensures that the file `03-cpu-pinning-nova.conf` is is used
+`cpu-pinning-nova` which ensures that the file `03-cpu-pinning-nova.conf` is used
 by Nova.
 
-Now that the `nova-custom-ovsdpdk` has been created, use the example
-[dataplane_v1beta1_openstackdataplanedeployment_ovs_dpdk](https://github.com/openstack-k8s-operators/openstack-operator/tree/main/config/samples/dataplane/ovs_dpdk)
-to start the second deployment.
+Now that the `nova-custom-ovs-dpdk` has been created, use the example
+[dataplane_v1beta1_openstackdataplanedeployment_ovs_dpdk](https://github.com/openstack-k8s-operators/dataplane-operator/tree/main/examples/ovs_dpdk)
+to start the deployment.
 ```
 oc kustomize --load-restrictor LoadRestrictionsNone openstack-operator/config/samples/dataplaneovs_dpdk > dataplane_cr.yaml
 oc create -f dataplane_cr.yaml
