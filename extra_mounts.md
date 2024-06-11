@@ -1,21 +1,26 @@
 # Strategy to provide files to services (extraMounts)
 
+ExtraMounts represent a feature that aims to extend the operators CRs
+and provide an interface to inject files to services.
+
 ## The problem
 
 - Provide configuration and credentials files for the storage backend.
   The Ceph cluster configuration and keyring files is one such
   example, and we need those files in Cinder service (volume and
   backup), Glance service, and Compute nodes. Another example would be
-  certificates for HTTPS requests to the storage array.
-  
+  certificates for HTTPS requests to the storage array, policy files,
+  asset files in case of Horizon, and any other relevant configuration file
+  that is required by the service.
+
 - Some Cinder drivers rely on the ability to bind mount directories in
   order to access content (could be data or an executable!) on the
   host.
-  
+
 - Some deployments run out of space in disk because of the local image
   conversion that happens on the create volume from image operation,
   so we need a way to use an NFS share for it.
-  
+
 - Some drivers need to preserve data that they store during runtime
   and that expect to be present when the service is restarted.
 
@@ -52,16 +57,85 @@ spec:
           extraVolType: Ceph
           volumes:
           - name: ceph
-            projected:
-              sources:
-              - secret:
-                  name: ceph-conf-files
+            secret:
+              name: ceph-conf-files
           mounts:
           - name: ceph
             mountPath: "/etc/ceph"
             readOnly: true
   ...
 ```
+
+The example above shows how `ExtraMounts` can be added to the top level
+`OpenStackControlPlane` CR. The resulting Volumes are propagated to both
+`CinderVolumes` Pods and `GlanceAPI` Pods. If no propagation is defined,
+volumes are propagated to all the services that implement the `ExtraMounts`
+interface. For more information about propagation, see [Propagating volumes
+section](https://github.com/openstack-k8s-operators/dev-docs/blob/main/extra_mounts.md#propagating-volumes).
+ExtraMounts can be added to the `OpenStackControlPlane` top-level CR, they
+can only be local to the service within the same CR, or they can be defined
+multiple times within the same CR.
+In general we define two different approaches that can be combined:
+
+1. `global`: ExtraMounts are added to the top-level `OpenStackControlPlane` CR
+2. `local`: ExtraMounts are added to the local service within the `OpenStackControlPlane` CR
+
+If both `global` and `local` approaches are used, for example:
+
+```yaml
+apiVersion: core.openstack.org/v1beta1
+kind: OpenStackControlPlane
+spec:
+  extraMounts:
+    - name: v1
+      region: r1
+      extraVol:
+        - propagation:
+          - CinderVolume
+          - GlanceAPI
+          extraVolType: Ceph
+          volumes:
+          - name: ceph
+            secret:
+              name: ceph-conf-files
+          mounts:
+          - name: ceph
+            mountPath: "/etc/ceph"
+            readOnly: true
+  cinder:
+    template:
+      extraMounts:
+        - name: v2
+          region: r1
+          extraVol:
+              volumes:
+              - name: ceph-1
+                secret:
+                  name: ceph-conf-files-1
+              mounts:
+              - name: ceph-1
+                mountPath: "/etc/ceph-1"
+                readOnly: true
+      cinderVolumes:
+        ceph:
+          networkAttachments:
+          - storage
+          customServiceConfig: | ...
+          ...
+          ...
+```
+
+volumes are the result of the concatenation between global and local ones.
+As a result of the above, `Glance` Pods only receive the secret provided by
+`ceph-conf-files`, while the `CinderVolume` `ceph` instance receives both
+the content of `ceph-conf-files`, and the content of `ceph-conf-files-1`.
+
+**Note**
+
+To keep the example simple, the secrets are mounted to different target
+directories: `/etc/ceph` and `/etc/ceph-1`, but using `projected` secrets we
+can obtain different results.
+
 
 ## Operators where ExtraMounts are used
 
@@ -72,6 +146,7 @@ spec:
 - https://github.com/openstack-k8s-operators/neutron-operator
 - https://github.com/openstack-k8s-operators/openstack-ansibleee-operator
 - https://github.com/openstack-k8s-operators/openstack-operator
+- https://github.com/openstack-k8s-operators/horizon-operator
 
 ## Volumes/VolumesMounts Data Model
 
@@ -157,10 +232,12 @@ func (g *GlanceExtraVolMounts) Propagate(svc []storage.PropagationType) []storag
   DataPlane etc).
 
 - Internal propagation: ability to propagate an extraVolume within the
-  single operator 
+  single operator.
 
-In case of Cinder, we can propagate a volume either to CinderVolume or
-CinderBackup, as well as to a single CinderVolume backend instance.
+For example, in case of Cinder, we can propagate a volume either to
+CinderVolume or CinderBackup, as well as to a single CinderVolume backend
+instance.
+Both Glance and Manila follow the same approach.
 
 ```
                      | +--------+ |
