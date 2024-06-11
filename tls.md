@@ -220,6 +220,60 @@ The configuration of the service is reflecting the k8s service name, not the ind
 
 For each of the k8s services the openstack-operator requests a certificate for the hostname `<service>.<namespace>.svc` and `<service>.<namespace>.svc.cluster.local` using the internal and the public `CertManager` issuer. For each cert request, CertManger will create a secret holding a `tls.crt`, `tls.key` and `ca.crt`. Those secrets, certificate and the combined CA bundle described above, can be passed into the service operators CRD using the tls section.
 
+## Additional Subject Alternative Names
+
+It is possible, for a given service, to define additional Subject Alternative Names
+that can be added to the `CertificateRequest` triggered by the `openstack-operator`.
+The definition of additional Subject Names is realized through an `Annotation` added
+to either public or internal services by the service operator.
+For example, the OpenStack Image Service (Glance) requires additional Subject Names
+DNS entries to ensure that the tls communication works properly when requests are
+proxied through replicas of the same glanceAPI resolved by an [headless service](https://kubernetes.io/docs/concepts/services-networking/service/#headless-services).
+For this reason, the `glance-operator` introduces an annotation like the following:
+
+```yaml
+apiVersion: v1
+kind: Service
+metadata:
+  annotations:
+    additionalSubjectNames: '*.glance-default-external-api.openstack.svc,*.glance-default-external-api.openstack.svc.cluster.local'
+    core.openstack.org/ingress_create: "true"
+    endpoint: public
+  labels:
+    component: glance-api
+    endpoint: public
+    glanceAPI: glance-default-external
+...
+...
+```
+
+The example above shows that a comma separated list of additional Subject Names
+can be added as the value of the `additionalSubjectNames` key. Such key is
+common to all the operators, and it's defined in the tls package of
+[lib-common/common](https://github.com/openstack-k8s-operators/lib-common/blob/main/modules/common)
+module.
+When the annotation described above is present, the `openstack-operator` is able
+to process its content, and it produces a `CertificateRequest` where additional
+`Hostnames` are added (as `dnsNames`) to the certificate generation process.
+Here's an example of the resulting `Certificate` CR processed by the `openstack-operator`
+via the `EnsureEndpointConfig` function:
+
+```yaml
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: glance-default-public-svc
+  namespace: openstack
+spec:
+  dnsNames:
+  - glance-default-public.openstack.svc
+  - glance-default-public.openstack.svc.cluster.local
+  - '*.glance-default-external-api.openstack.svc'
+  - '*.glance-default-external-api.openstack.svc.cluster.local'
+...
+...
+```
+
 ## Deployments Not Using k8s Services
 
 TBD when e.g. ovn got added
