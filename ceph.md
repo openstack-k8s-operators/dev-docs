@@ -36,7 +36,7 @@ The commands in this section should be run on a Ceph server.
 
 Create pools for Nova (vms), Cinder (volumes) and Glance (images).
 ```shell
-for P in vms volumes images; do 
+for P in vms volumes images; do
   cephadm shell -- ceph osd pool create $P;
   cephadm shell -- ceph osd pool application enable $P rbd;
 done
@@ -50,7 +50,7 @@ cephadm shell -- ceph fs volume create cephfs
 Create a cephx key which OpenStack can use to access the pools.
 ```shell
 cephadm shell -- \
-   ceph auth add client.openstack \ 
+   ceph auth add client.openstack \
      mgr 'allow rw' \
 	 mon 'allow r' \
 	 osd 'allow class-read object_prefix rbd_children, allow rwx pool=vms, allow rwx pool=volumes, allow rwx pool=images'
@@ -292,7 +292,7 @@ in the "Create a Ceph Secret" section. The FSID itself does not need
 to be considered secret.
 
 Create a custom version of the
-[nova service](https://github.com/openstack-k8s-operators/dataplane-operator/blob/main/config/services/dataplane_v1beta1_openstackdataplaneservice_nova.yaml)
+[nova service](https://github.com/openstack-k8s-operators/openstack-operator/blob/main/config/services/dataplane_v1beta1_openstackdataplaneservice_nova.yaml)
 which ships with the dataplane operator so that it uses the ConfigMap
 by adding it to the `configMaps` list.
 ```yaml
@@ -316,7 +316,7 @@ overwrite any custom service with the same name during reconciliation.
 After the `ConfigMap` and `OpenStackDataPlaneService` services above
 have been created (e.g. `oc create -f ceph-nova.yaml`), update the
 `OpenStackDataPlaneNodeSet`
-[EDPM services list](https://openstack-k8s-operators.github.io/dataplane-operator/composable_services)
+[EDPM services list](https://openstack-k8s-operators.github.io/openstack-operator/dataplane/#_composable_services)
 to replace the `nova` service with `nova-custom-ceph` and add the
 `ceph-client` service.
 
@@ -510,4 +510,4 @@ CR can be modified to include Ceph configuration by adding
 examples are below.
 
 - `OpenStackControlPlane`: [core_v1beta1_openstackcontrolplane_network_isolation_ceph.yaml](https://github.com/openstack-k8s-operators/openstack-operator/blob/main/config/samples/core_v1beta1_openstackcontrolplane_network_isolation_ceph.yaml)
-- `OpenStackDataPlaneNodeSet`: [dataplane_v1beta1_openstackdataplanenodeset_ceph.yaml](https://github.com/openstack-k8s-operators/dataplane-operator/blob/main/config/samples/dataplane_v1beta1_openstackdataplanenodeset_ceph.yaml)
+- `OpenStackDataPlaneNodeSet`: [dataplane_v1beta1_openstackdataplanenodeset_ceph.yaml](https://github.com/openstack-k8s-operators/openstack-operator/tree/main/config/samples/dataplane/ceph)

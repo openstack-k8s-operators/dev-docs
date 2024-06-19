@@ -17,7 +17,7 @@ In order to complete the above procedure, the `services` list of the
 
 EDPM nodes can be configured by creating an
 `OpenStackDataPlaneNodeSet` CR which the
-[dataplane-operator](https://openstack-k8s-operators.github.io/dataplane-operator)
+[openstack-operator](https://openstack-k8s-operators.github.io/openstack-operator)
 will reconcile when an `OpenStackDataPlaneDeployment` CR is created.
 These types of CRs have a `services` list like the following:
 
@@ -59,7 +59,7 @@ This example also assumes that the EDPM nodes:
 
 Create an `OpenStackDataPlaneNodeSet` CR file,
 e.g. `dataplane_cr.yaml` to represent the EDPM nodes. See
-[dataplane_v1beta1_openstackdataplanenodeset.yaml](https://github.com/openstack-k8s-operators/dataplane-operator/blob/main/config/samples/dataplane_v1beta1_openstackdataplanenodeset.yaml)
+[dataplane_v1beta1_openstackdataplanenodeset.yaml](https://github.com/openstack-k8s-operators/openstack-operator/blob/main/config/samples/dataplane_v1beta1_openstackdataplanenodeset.yaml)
 for an example to modify as described in this document.
 
 Do not yet create the CR in OpenShift as the edits described in the
@@ -85,7 +85,8 @@ the storage network. It does not cover the `storage_mgmt` network
 since that network is used exclusively by Ceph.
 
 The example
-[dataplane_v1beta1_openstackdataplanenodeset_ceph_hci.yaml](https://github.com/openstack-k8s-operators/dataplane-operator/blob/main/config/samples/dataplane_v1beta1_openstackdataplanenodeset_ceph_hci.yaml)
+[dataplane_v1beta1_openstackdataplanenodeset_pre_ceph_hci.yaml](https://github.com/openstack-k8s-operators/openstack-operator/tree/main/config/samples/dataplane/pre_ceph_hci) and
+[dataplane_v1beta1_openstackdataplanenodeset_post_ceph_hci.yaml](https://github.com/openstack-k8s-operators/openstack-operator/tree/main/config/samples/dataplane/post_ceph_hci)
 has both the `storage` and `storage_mgmt` networks since those EDPM
 nodes will host Ceph OSDs.
 
@@ -100,7 +101,8 @@ management network range is `172.20.0.0/24` and that it is on `VLAN23`.
 ### MTU Settings for Ceph
 
 The example
-[dataplane_v1beta1_openstackdataplanenodeset_ceph_hci.yaml](https://github.com/openstack-k8s-operators/dataplane-operator/blob/main/config/samples/dataplane_v1beta1_openstackdataplanenodeset_ceph_hci.yaml)
+[dataplane_v1beta1_openstackdataplanenodeset_pre_ceph_hci.yaml](https://github.com/openstack-k8s-operators/openstack-operator/tree/main/config/samples/dataplane/pre_ceph_hci) and
+[dataplane_v1beta1_openstackdataplanenodeset_post_ceph_hci.yaml](https://github.com/openstack-k8s-operators/openstack-operator/tree/main/config/samples/dataplane/post_ceph_hci)
 changes the MTU of the `storage` and `storage_mgmt`
 network from `1500` to `9000` (jumbo frames) for improved storage
 performance (though it is not mandatory to increase the MTU). If jumbo
@@ -131,10 +133,13 @@ communicate at the desired MTU with a command like `ping -M do -s 8972
 ### Create the OpenStackDataPlaneNodeSet
 
 Create the CR from your file based on the example
-[dataplane_v1beta1_openstackdataplanenodeset_ceph_hci.yaml](https://github.com/openstack-k8s-operators/dataplane-operator/blob/main/config/samples/dataplane_v1beta1_openstackdataplanenodeset_ceph_hci.yaml)
+[dataplane_v1beta1_openstackdataplanenodeset_pre_ceph_hci.yaml](https://github.com/openstack-k8s-operators/openstack-operator/tree/main/config/samples/dataplane/pre_ceph_hci) and
+[dataplane_v1beta1_openstackdataplanenodeset_post_ceph_hci.yaml](https://github.com/openstack-k8s-operators/openstack-operator/tree/main/config/samples/dataplane/post_ceph_hci)
 with the changes described in the previous section.
 ```
-oc create -f dataplane_cr.yaml
+oc kustomize --load-restrictor LoadRestrictionsNone config/samples/dataplane/pre_ceph_hci | oc apply -f -
+oc kustomize --load-restrictor LoadRestrictionsNone config/samples/dataplane/post_ceph_hci | oc apply -f -
+
 ```
 
 ### Create a pre-Ceph OpenStackDataPlaneDeployment
@@ -149,7 +154,7 @@ of services of an `OpenStackDataPlaneNodeSet` for a
 deployment.
 
 The example
-[dataplane_v1beta1_openstackdataplanedeployment_pre_ceph_hci.yaml](https://github.com/openstack-k8s-operators/dataplane-operator/blob/main/config/samples/dataplane_v1beta1_openstackdataplanedeployment_pre_ceph_hci.yaml)
+[dataplane_v1beta1_openstackdataplanedeployment_pre_ceph_hci.yaml](https://github.com/openstack-k8s-operators/openstack-operator/tree/main/config/samples/dataplane/pre_ceph_hci)
 has a shortened list of services which need to be configured
 before Ceph is deployed on an EDPM node in an HCI scenario.
 
@@ -161,7 +166,7 @@ oc create -f openstackdataplanedeployment_pre_ceph_hci.yaml
 #### Pre-Ceph Service Details
 
 The example
-[dataplane_v1beta1_openstackdataplanedeployment_pre_ceph_hci.yaml](https://github.com/openstack-k8s-operators/dataplane-operator/blob/main/config/samples/dataplane_v1beta1_openstackdataplanedeployment_pre_ceph_hci.yaml)
+[dataplane_v1beta1_openstackdataplanedeployment_pre_ceph_hci.yaml](https://github.com/openstack-k8s-operators/openstack-operator/tree/main/config/samples/dataplane/pre_ceph_hci)
 contains the `ceph-hci-pre` service. This service
 prepares EDPM nodes to host Ceph services
 after the network has been configured. It does this by running the
@@ -188,7 +193,7 @@ list above. For more informatoin, see the `ceph-hci-pre` role in the
 [edpm-ansible role documentation](https://openstack-k8s-operators.github.io/edpm-ansible/roles.html).
 
 As seen in the example
-[dataplane_v1beta1_openstackdataplanedeployment_pre_ceph_hci.yaml](https://github.com/openstack-k8s-operators/dataplane-operator/blob/main/config/samples/dataplane_v1beta1_openstackdataplanedeployment_pre_ceph_hci.yaml),
+[dataplane_v1beta1_openstackdataplanedeployment_pre_ceph_hci.yaml](https://github.com/openstack-k8s-operators/openstack-operator/tree/main/config/samples/dataplane/pre_ceph_hci),
 the `configure-os` and `run-os` services are run after `ceph-hci-pre`
 because they enable the firewall rules which `ceph-hci-pre` put in
 place. The `run-os` service also configures NTP, which is requried by
@@ -418,7 +423,7 @@ Create a second `OpenStackDataPlaneDeployment` which will trigger the
 Ansible jobs to complete the EDPM Compute node configuration.
 
 The example
-[dataplane_v1beta1_openstackdataplanedeployment_post_ceph_hci.yaml](https://github.com/openstack-k8s-operators/dataplane-operator/blob/main/config/samples/dataplane_v1beta1_openstackdataplanedeployment_post_ceph_hci.yaml)
+[dataplane_v1beta1_openstackdataplanedeployment_post_ceph_hci.yaml](https://github.com/openstack-k8s-operators/openstack-operator/blob/main/config/samples/dataplane_v1beta1_openstackdataplanedeployment_post_ceph_hci.yaml)
 has a shortened list of services which need to be configured
 after Ceph is deployed on an EDPM node in an HCI scenario.
 
@@ -427,7 +432,7 @@ custom `OpenStackDataPlaneService` called `nova-custom-ceph`
 has been created as described in
 the [documentation to configure OpenStack to use Ceph](ceph.md).
 The `nova-custom-ceph` can be seen in the
-[example](https://github.com/openstack-k8s-operators/dataplane-operator/blob/main/config/samples/dataplane_v1beta1_openstackdataplanedeployment_post_ceph_hci.yaml)
+[example](https://github.com/openstack-k8s-operators/openstack-operator/blob/main/config/samples/dataplane_v1beta1_openstackdataplanedeployment_post_ceph_hci.yaml)
 and takes the place of the default `nova`
 OpenStackDataPlaneService. This custom service uses a ConfigMap called
 `ceph-nova` which ensures that the file `03-ceph-nova.conf` is is used
@@ -470,7 +475,7 @@ spec:
 ```
 
 Now that the `nova-custom-ceph` has been created, use the example
-[dataplane_v1beta1_openstackdataplanedeployment_post_ceph_hci.yaml](https://github.com/openstack-k8s-operators/dataplane-operator/blob/main/config/samples/dataplane_v1beta1_openstackdataplanedeployment_post_ceph_hci.yaml)
+[dataplane_v1beta1_openstackdataplanedeployment_post_ceph_hci.yaml](https://github.com/openstack-k8s-operators/openstack-operator/blob/main/config/samples/dataplane_v1beta1_openstackdataplanedeployment_post_ceph_hci.yaml)
 to start the second deployment.
 
 ```

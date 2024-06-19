@@ -2,7 +2,7 @@
 
 ## Outline
 
-We release set of operators as a single product called the 'OpenStack Operator'. The openstack-operator itself 
+We release set of operators as a single product called the 'OpenStack Operator'. The openstack-operator itself
 acts as a meta operator. It contains CRDs which can be used to create an OpenStackControlplane in a single action.
 Additionally, installation of of a specific version of the openstack-operator drives the installation of all
 openstack service operators via OLM (Operator Lifecycle Manager) dependencies. This document aims to summarize the
@@ -16,7 +16,7 @@ For each operator/repository upstream we build 3 artifact/containers:
 * bundle
 * catalog/index image (upstream only)
 
-The last artifact above (catalog/index images) are provided as a convience upstream as a means to install ad-hoc sets of 
+The last artifact above (catalog/index images) are provided as a convience upstream as a means to install ad-hoc sets of
 OpenStack services operators via projects like install_yamls. They are not used directly in the productized openstack-operator.
 The operator container and bundle are used in all deployment cases whether you install individual operators, or as a set via
 the meta openstack-operator.
@@ -38,10 +38,7 @@ the following extra steps:
 
 * It contains a dependencies.yaml file which drives OLM dependencies to install all other OpenStack service operators
 * When the bundle is generated it runs a script to *merge* all the ENV variables from each service operators controller-manager. These ENV variables contain important webhook defaults that are needed within the OpenStack operator.
-* A csv-merger is used to merge in the CSV from the dataplane-operator along with all the ENV variables harvested from the above.
-
-NOTE: The dataplane-operator is merged into the CSV of the openstack-operator so that it's CRD can be treated
-as a top level visible resource in the OpenShift UI.
+* A csv-merger is used to merge all the ENV variables harvested from the above.
 
 NOTE: We no longer merge all the CSV for all openstack service operators because we hit the bundle size limit. This is a limitation due to how OLM relies on ConfigMaps when unpacking bundles. (separate bundles are required for OpenStack operators at this time)
 
@@ -55,7 +52,7 @@ container image from a go.mod entry that looks like this:
 ```golang
     github.com/openstack-k8s-operators/cinder-operator/api v0.3.1-0.20231114160640-3c5c40e6cc3a
 ```
-The last part of the psuedoversion corresponds to a git commit sha and can be used to pull in 
+The last part of the psuedoversion corresponds to a git commit sha and can be used to pull in
 dependencies from the associated bundle for that service operator.
 In this case: quay.io/openstack-k8s-operators/cinder-operator-bundle:3c5c40e6cc3aba6e287b94d26770519f76ae9528 would get used.
 

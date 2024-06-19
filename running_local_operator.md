@@ -10,8 +10,8 @@ ran `make openstack`) will conflict with your local copy. E.g. both
 operators might try to resolve the same CR.
 
 To avoid the conflict, scale down the operator deployed by the meta
-operator by either setting its controller-manager pod replicas to 0 
-or removing the deployment from the CSV entirely so that only your 
+operator by either setting its controller-manager pod replicas to 0
+or removing the deployment from the CSV entirely so that only your
 local operator will resolve its CR.
 
 ## Disabling a service within the CSV
@@ -43,40 +43,6 @@ oc patch csv -n openstack-operators <your operator CSV> --type json \
 
 ```
 oc patch csv -n openstack-operators <your operator CSV> --type=merge --patch-file=operator_csv.json
-```
-
-### Finding the dataplane-operator in the CSV
-
-The dataplane-operator is
-[in the openstack operator bundle](https://github.com/openstack-k8s-operators/openstack-operator/commit/35d2a584fd890b13563160be2f19acbef98858ad)
-so it won't show up in the list all CSV objects.
-```
-$ oc get csv | grep dataplane | wc -l
-0
-$
-```
-Instead get the CSV of the openstack-operator.
-```
-$ oc get csv | grep openstack-operator
-openstack-operator.v0.0.1               OpenStack                      0.0.1                            Succeeded
-$
-```
-and use it to confirm it contains OpenStackDataPlane objects.
-```
-$ oc get csv openstack-operator.v0.0.1 -o json | jq .spec.customresourcedefinitions.owned | grep description | grep DataPlane
-    "description": "OpenStackDataPlaneDeployment is the Schema for the openstackdataplanedeployments API",
-    "description": "OpenStackDataPlaneNodeSet is the Schema for the openstackdataplanenodesets API",
-    "description": "OpenStackDataPlaneService is the Schema for the openstackdataplaneservices API",
-$
-```
-Thus, to scale down the dataplane-operator as described in the
-previous section, a command like this:
-```
-oc get csv -n openstack-operators <your operator CSV>
-```
-can be run like this:
-```
-oc get csv openstack-operator.v0.0.1
 ```
 
 ## An Alternative Approach Provided by ChatGPT
@@ -151,7 +117,7 @@ index deeb5ec..ea19e9d 100644
 +++ b/Makefile
 @@ -129,10 +129,12 @@ build: generate fmt vet ## Build manager binary.
         go build -o bin/manager main.go
- 
+
  .PHONY: run
 +run: export METRICS_PORT?=8080
 +run: export HEALTH_PORT?=8081
@@ -160,7 +126,7 @@ index deeb5ec..ea19e9d 100644
         /bin/bash hack/clean_local_webhook.sh
 -       go run ./main.go
 +       go run ./main.go -metrics-bind-address ":$(METRICS_PORT)" -health-probe-bind-address ":$(HEALTH_PORT)"
- 
+
  .PHONY: docker-build
  docker-build: test ## Build docker image with the manager.
 ```

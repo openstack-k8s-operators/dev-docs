@@ -27,23 +27,23 @@ The config goes through the following journey:
 5. The ConfigMap gets created in k8s during the early phases of the EDPM
    deployment by the
    [joint effort of install_yamls and ci_framework](https://github.com/openstack-k8s-operators/ci-framework/blob/b66ddaf89f3034870e55955786eb5eb7598017ff/ci_framework/roles/edpm_deploy/tasks/main.yml#L47-L115).
-6. A new [`OpenStackDataPlaneService` CR](https://github.com/openstack-k8s-operators/dataplane-operator/blob/main/docs/openstack_dataplaneservice.md)
+6. A new [`OpenStackDataPlaneService` CR](https://openstack-k8s-operators.github.io/openstack-operator/dataplane/#openstackdataplaneservice)
    referencing the
    [`osp.edpm.nova` ansible playbook](https://github.com/openstack-k8s-operators/edpm-ansible/blob/main/playbooks/nova.yml)
    is [created](https://github.com/openstack-k8s-operators/install_yamls/blob/80eac86dc1a86147f41bf41aeb754309876fbee0/scripts/gen-edpm-kustomize.sh#L195-L208)
-   from the [default nova service sample](https://github.com/openstack-k8s-operators/dataplane-operator/blob/main/config/services/dataplane_v1beta1_openstackdataplaneservice_nova.yaml)
+   from the [default nova service sample](https://github.com/openstack-k8s-operators/openstack-operator/blob/main/config/services/dataplane_v1beta1_openstackdataplaneservice_nova.yaml)
    to reference the new ConfigMap. We need to do this as the default service
    CR is not modifiable.
-7. The default [`OpenStackDataPlaneNodeSet` CR](https://github.com/openstack-k8s-operators/dataplane-operator/blob/main/docs/openstack_dataplanenodeset.md)
+7. The default [`OpenStackDataPlaneNodeSet` CR](https://openstack-k8s-operators.github.io/openstack-operator/dataplane/#openstackdataplanenodeset)
    is [changed](https://github.com/openstack-k8s-operators/install_yamls/blob/80eac86dc1a86147f41bf41aeb754309876fbee0/scripts/gen-edpm-kustomize.sh#L232)
    to use the new `OpenStackDataPlaneService` CR instead of the default one.
 8. When the
-   [`OpenStackDataPlaneDeployment` CR](https://github.com/openstack-k8s-operators/dataplane-operator/blob/main/docs/openstack_dataplanedeployment.md)
+   [`OpenStackDataPlaneDeployment` CR](https://openstack-k8s-operators.github.io/openstack-operator/dataplane/#openstackdataplanedeployment)
    is [created](https://github.com/openstack-k8s-operators/ci-framework/blob/28e8d32147d0c71f4060c3da6fc38090b35d6aa0/roles/edpm_deploy/tasks/main.yml#L82-L150)
-   the [dataplane-operator translates](https://github.com/openstack-k8s-operators/dataplane-operator/blob/8d8a1051288a065e8fec16e07c907dc08ebbb4d8/controllers/openstackdataplanedeployment_controller.go#L225-L228)
+   the [openstack-operator translates](https://github.com/openstack-k8s-operators/openstack-operator/blob/e05abcb7c00aa84214a951ec7f4dea5a46802221/controllers/dataplane/openstackdataplanedeployment_controller.go#L315-L335)
    the `OpenStackDataPlaneService` CR to
-   an [`OpenStackAnsibleEE` CR](https://github.com/openstack-k8s-operators/openstack-ansibleee-operator/blob/main/docs/openstack_ansibleee.md)
-   and [ensures](https://github.com/openstack-k8s-operators/dataplane-operator/blob/b8c94dc3631cef634f29760e07b938595a630572/pkg/deployment/deployment.go#L200)
+   an [`OpenStackAnsibleEE` CR](https://openstack-k8s-operators.github.io/openstack-ansibleee-operator/#openstackansibleee)
+   and [ensures](https://github.com/openstack-k8s-operators/openstack-operator/blob/e05abcb7c00aa84214a951ec7f4dea5a46802221/pkg/dataplane/deployment.go#L368)
    that the ConfigMap is translated to an item in the `extraVolumes` field of
    the `OpenStackAnsibleEE` CR.
 9. The [openstack-ansibleee-operator creates a k8s Job](https://github.com/openstack-k8s-operators/openstack-ansibleee-operator/blob/a0ea58b83c3acc84d450723dda4d356c2555f781/controllers/openstack_ansibleee_controller.go#L204-L207)
