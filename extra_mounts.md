@@ -140,7 +140,6 @@ can obtain different results.
 ## Operators where ExtraMounts are used
 
 - https://github.com/openstack-k8s-operators/cinder-operator
-- https://github.com/openstack-k8s-operators/dataplane-operator
 - https://github.com/openstack-k8s-operators/glance-operator
 - https://github.com/openstack-k8s-operators/manila-operator
 - https://github.com/openstack-k8s-operators/neutron-operator
@@ -180,7 +179,7 @@ The following is an explanation of the `volMounts` struct in
 
 Examples:
 
-- The `ExtraVolType` label can be used in the logic of an operator: 
+- The `ExtraVolType` label can be used in the logic of an operator:
 [dataplane-operator usage](https://github.com/openstack-k8s-operators/dataplane-operator/blob/5ebd8ad49a6b674c930b24f28f3da4656ac088ef/pkg/deployment/deployment.go#L224-L229).
 ```go
 	for _, extraMount := range extraMounts {
@@ -197,7 +196,7 @@ Examples:
 	// ExtraMounts containing conf files and credentials
 	ExtraMounts []storage.VolMounts `json:"extraMounts,omitempty"`
 ```
-- An operator can extend the struct as per the service requirements: 
+- An operator can extend the struct as per the service requirements:
 [glance-operator usage](https://github.com/openstack-k8s-operators/glance-operator/blob/5a38bd9e82681d456d1dcab00b7c9e7944db6178/api/v1beta1/glance_types.go#L192-L214)
 ```go
 // GlanceExtraVolMounts exposes additional parameters processed by the glance-operator
@@ -260,7 +259,7 @@ Both Glance and Manila follow the same approach.
 
 - Add the data structure to the API
 - Make sure the Spec.ExtraMounts is properly propagated in the main controller
-- Add the logic to process the extraMounts in the deployments/statefulsets 
+- Add the logic to process the extraMounts in the deployments/statefulsets
 - Integrate it in the meta-operator
   - Update the CRD
   - Pass the parameter through the top-level spec
