@@ -124,3 +124,45 @@ Status:
       /var/lib/kolla/config_files/config.json from config (ro,path="neutron-api-config.json")
       /var/run/secrets/kubernetes.io/serviceaccount from kube-api-access-rhk5m (ro)
 ```
+
+# Testing OpenStack code changes in the CI
+
+With [recent change](https://github.com/openstack-k8s-operators/ci-framework/pull/1892)
+in the ci-framework it is now possible to run operator's CI jobs together with
+the depends-on patch proposed for the upstream OpenStack project in upstream
+gerrit.
+
+This require to replace `openstack-k8s-operators-content-provider` job with
+`openstack-meta-content-provider` job as dependency for other jobs in
+the zuul's job configuration. Variables required to be set for this job are:
+
+```
+openstack-meta-content-provider:
+  vars:
+    cifmw_bop_openstack_release: master
+    cifmw_bop_dlrn_baseurl: "https://trunk.rdoproject.org/centos9-master"
+    cifmw_repo_setup_branch: master
+```
+
+Additional variable needs to be set for the tested project's job to build
+project from the upstream master branch.
+In the below example `neutron-operator-tempest-multinode` job is modified:
+
+```
+neutron-operator-tempest-multinode:
+  ...
+  vars:
+    ...
+    cifmw_repo_setup_branch: master
+```
+
+With such changes to the zuul's job configuration in the operator's repository
+Pull Request to that repo can be opened with the `Depends-On` directive pointing
+to the upsteam gerrit change. This change will be then included in the
+containers build for the CI job and used there.
+
+There is example [pull
+request](https://github.com/openstack-k8s-operators/neutron-operator/pull/372)
+done for the neutron-operator repo. It also runs with the example
+[change](https://review.opendev.org/c/openstack/neutron/+/922783) proposed to
+the upstream neutron repository.
