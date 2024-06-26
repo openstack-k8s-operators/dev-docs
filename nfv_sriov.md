@@ -16,7 +16,7 @@ In order to complete the above procedure, the `services` list of the
 
 EDPM nodes can be configured by creating an
 `OpenStackDataPlaneNodeSet` CR which the
-[dataplane-operator](https://openstack-k8s-operators.github.io/dataplane-operator)
+[openstack-operator](https://openstack-k8s-operators.github.io/openstack-operator/dataplane)
 will reconcile to create OpenStackDataPlaneService resources
 when an `OpenStackDataPlaneNodeSet` CR is created.
 These types of CRs have a `services` list like the following:
@@ -88,7 +88,7 @@ edpm_network_config_template
 
 Create an `OpenStackDataPlaneNodeSet` CR file,
 e.g. `dataplane_cr.yaml` to represent the EDPM nodes. See
-[dataplane_v1beta1_openstackdataplanenodeset.yaml](https://github.com/openstack-k8s-operators/dataplane-operator/blob/main/config/samples/dataplane_v1beta1_openstackdataplanenodeset.yaml)
+[dataplane_v1beta1_openstackdataplanenodeset.yaml](https://github.com/openstack-k8s-operators/openstack-operator/blob/main/config/samples/dataplane_v1beta1_openstackdataplanenodeset.yaml)
 for an example to modify as described in this document.
 
 ```
@@ -96,7 +96,7 @@ Do not yet create the CR in OpenShift as the edits described in the
 next sections are required.
 ```
 The example
-[dataplane_v1beta1_openstackdataplanenodeset_sriov.yaml]https://github.com/openstack-k8s-operators/dataplane-operator/tree/main/examples/sriov)
+[dataplane_v1beta1_openstackdataplanenodeset_sriov.yaml](https://github.com/openstack-k8s-operators/openstack-operator/tree/main/config/samples/dataplane/sriov)
 has SRIOV interfaces network configuration and required edpm ansible parameters.
 
 Modify your `OpenStackDataPlaneNodeSet` CR to set
@@ -143,8 +143,8 @@ the files are evaluated by Nova alphabetically (e.g. `01-foo-nova.conf`
 is processed before `02-bar-nova.conf`).
 
 Create a custom version of the
-[nova service](https://github.com/openstack-k8s-operators/dataplane-operator/blob/main/config/services/dataplane_v1beta1_openstackdataplaneservice_nova.yaml)
-which ships with the dataplane operator so that it uses the ConfigMap
+[nova service](https://github.com/openstack-k8s-operators/openstack-operator/blob/main/config/services/dataplane_v1beta1_openstackdataplaneservice_nova.yaml)
+which ships with the openstack operator so that it uses the ConfigMap
 by adding it to the `configMaps` list.
 ```yaml
 ---
@@ -180,7 +180,7 @@ overwrite any custom service with the same name during reconciliation.
 After the `ConfigMap` and `OpenStackDataPlaneService` services above
 have been created (e.g. `oc create -f nova-custom-sriov.yaml`), update the
 `OpenStackDataPlaneNodeSet`
-[EDPM services list](https://openstack-k8s-operators.github.io/dataplane-operator/composable_services)
+[EDPM services list](https://openstack-k8s-operators.github.io/openstack-operator/dataplane/#_composable_services)
 to replace the `nova` service with `nova-custom-sriov`.
 
 ```yaml
@@ -219,10 +219,10 @@ overrides from the `ConfigMap`s onto the Nova hosts.
 ### Create the OpenStackDataPlaneNodeSet
 
 Create the CR from your directory based on the example
-[dataplane_v1beta1_openstackdataplanenodeset_sriov](https://github.com/openstack-k8s-operators/dataplane-operator/tree/main/examples/sriov)
+[dataplane_v1beta1_openstackdataplanenodeset_sriov](https://github.com/openstack-k8s-operators/openstack-operator/tree/main/config/samples/dataplane/sriov)
 with the changes described in the previous section.
 ```
-oc kustomize --load-restrictor LoadRestrictionsNone dataplane-operator/examples/sriov > dataplane_cr.yaml
+oc kustomize --load-restrictor LoadRestrictionsNone config/samples/dataplane/sriov > dataplane_cr.yaml
 ```
 
 ### Create a OpenStackDataPlaneDeployment
@@ -237,28 +237,28 @@ of services of an any `OpenStackDataPlaneNodeSet` in the
 list for a deployment.
 
 The example
-[dataplane_v1beta1_openstackdataplanedeployment_sriov](https://github.com/openstack-k8s-operators/dataplane-operator/tree/main/examples/sriov)
+[dataplane_v1beta1_openstackdataplanedeployment_sriov](https://github.com/openstack-k8s-operators/openstack-operator/tree/main/config/samples/dataplane/sriov)
 
 Create the CR based on the example
 ```
-oc kustomize --load-restrictor LoadRestrictionsNone dataplane-operator/examples/sriov > dataplane_cr.yaml
+oc kustomize --load-restrictor LoadRestrictionsNone config/samples/dataplane/sriov > dataplane_cr.yaml
 ```
 
 Custom `OpenStackDataPlaneService` called `nova-custom-sriov`
 has been created as described in
 the [documentation to configure OpenStack to use SRIOV](sriov.md).
 The `nova-custom-sriov` can be seen in the
-[example](https://github.com/openstack-k8s-operators/dataplane-operator/tree/main/examples/sriov)
+[example](https://github.com/openstack-k8s-operators/openstack-operator/tree/main/config/samples/dataplane/sriov)
 and takes the place of the default `nova`
 OpenStackDataPlaneService. This custom service uses a `ConfigMap` called
 `cpu-pinning-nova` which ensures that the file `03-cpu-pinning-nova.conf` is used
 by Nova.
 
 Now that the `nova-custom-sriov` has been created, use the example
-[dataplane_v1beta1_openstackdataplanedeployment_sriov](https://github.com/openstack-k8s-operators/dataplane-operator/tree/main/examples/sriov)
+[dataplane_v1beta1_openstackdataplanedeployment_sriov](https://github.com/openstack-k8s-operators/openstack-operator/tree/main/config/samples/dataplane/sriov)
 to start the deployment.
 ```
-oc kustomize --load-restrictor LoadRestrictionsNone dataplane-operator/examples/sriov > dataplane_cr.yaml
+oc kustomize --load-restrictor LoadRestrictionsNone config/samples/dataplane/sriov > dataplane_cr.yaml
 oc create -f dataplane_cr.yaml
 ```
 

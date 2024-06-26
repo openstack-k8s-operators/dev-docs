@@ -187,7 +187,7 @@ overwrite any custom service with the same name during reconciliation.
 After the `ConfigMap` and `OpenStackDataPlaneService` services above
 have been created (e.g. `oc create -f nova-custom-ovs-dpdk.yaml`), update the
 `OpenStackDataPlaneNodeSet`
-[EDPM services list](https://openstack-k8s-operators.github.io/dataplane-operator/composable_services)
+[EDPM services list](https://openstack-k8s-operators.github.io/openstack-operator/dataplane/#_composable_services)
 to replace the `nova` service with `nova-custom-ovs-dpdk`.
 
 ```yaml
@@ -229,7 +229,7 @@ Create the CR from your directory based on the example
 [dataplane_v1beta1_openstackdataplanenodeset_ovs_dpdk](https://github.com/openstack-k8s-operators/openstack-operator/tree/main/config/samples/dataplane/ovs_dpdk)
 with the changes described in the previous section.
 ```
-oc kustomize --load-restrictor LoadRestrictionsNone openstack-operator/config/samples/dataplaneovs_dpdk > dataplane_cr.yaml
+oc kustomize --load-restrictor LoadRestrictionsNone openstack-operator/config/samples/dataplane/ovs_dpdk > dataplane_cr.yaml
 ```
 
 ### Create a OpenStackDataPlaneDeployment
@@ -248,24 +248,24 @@ The example
 
 Create the CR based on the example
 ```
-oc kustomize --load-restrictor LoadRestrictionsNone openstack-operator/config/samples/dataplaneovs_dpdk > dataplane_cr.yaml
+oc kustomize --load-restrictor LoadRestrictionsNone openstack-operator/config/samples/dataplane/ovs_dpdk > dataplane_cr.yaml
 ```
 
 Custom `OpenStackDataPlaneService` called `nova-custom-ovs-dpdk`
 has been created as described in
 the [documentation to configure OpenStack to use OVS DPDK](ovs_dpdk.md).
 The `nova-custom-ovs-dpdk` can be seen in the
-[example](https://github.com/openstack-k8s-operators/dataplane-operator/tree/main/examples/ovs_dpdk)
+[example](https://github.com/openstack-k8s-operators/openstack-operator/tree/main/config/samples/dataplane/ovs_dpdk)
 and takes the place of the default `nova`
 OpenStackDataPlaneService. This custom service uses a `ConfigMap` called
 `cpu-pinning-nova` which ensures that the file `03-cpu-pinning-nova.conf` is used
 by Nova.
 
 Now that the `nova-custom-ovs-dpdk` has been created, use the example
-[dataplane_v1beta1_openstackdataplanedeployment_ovs_dpdk](https://github.com/openstack-k8s-operators/dataplane-operator/tree/main/examples/ovs_dpdk)
+[dataplane_v1beta1_openstackdataplanedeployment_ovs_dpdk](https://github.com/openstack-k8s-operators/openstack-operator/tree/main/config/samples/dataplane/ovs_dpdk)
 to start the deployment.
 ```
-oc kustomize --load-restrictor LoadRestrictionsNone openstack-operator/config/samples/dataplaneovs_dpdk > dataplane_cr.yaml
+oc kustomize --load-restrictor LoadRestrictionsNone openstack-operator/config/samples/dataplane/ovs_dpdk > dataplane_cr.yaml
 oc create -f dataplane_cr.yaml
 ```
 
