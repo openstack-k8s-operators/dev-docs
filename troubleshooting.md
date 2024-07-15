@@ -118,28 +118,38 @@ troubleshooting guide.
 This guide will provide an example of troubleshooting a scenario where
 an image is not written to Ceph in Glance. However, the steps are also
 applicable Cinder or Nova being unable to write to Ceph. We assume
-that the pods is not crashlooping as described in the section above.
+that the pods might not be in crashlooping status as described in the
+section above.
 
-1. Confirm the pod has the Ceph configuration files
+1. Confirm the `Pod` has the Ceph configuration files
 
 The [Ceph integration documentation](ceph.md) describes using
 `ExtraMounts` to place files like `ceph.client.openstack.keyring`
-and `ceph.conf` in `/etc/ceph` in each pod which needs to connect
-to Ceph. Connect to the pod with `oc rsh` and ensure that both of
-these files are present.
+and `ceph.conf` in `/etc/ceph` in each `Pod` which needs to connect
+to Ceph.
+Run `oc describe <glance_pod>` and look for both `Mounts` and `Volumes` list:
+if the Ceph related bits have been properly propagated, there must be an entry
+pointing to `/etc/ceph` which is populated by the referenced Ceph `Secret`.
+If the Ceph files are missing, check the syntax of the `ExtraMounts` section of
+the spec in the `OpenStackControlPlane`. If the Glance `Pod` is in a
+`CrashLoopBackOff` status, it is required to build a debug `Pod` and run it as
+described in the [glance-operator troubleshooting
+guide](https://github.com/openstack-k8s-operators/glance-operator/blob/main/docs/dev/troubleshooting.md)
 
-If the Ceph files are missing, check the syntax of
-the `ExtraMounts` section of the spec in the `OpenStackControlPlane`.
+Run a debug `Pod` with the following command:
+
+```
+oc debug pod/glance-default-external-api-0 --keep-labels=true
+```
 
 2. Confirm the pod can reach the Ceph cluster
 
-The Ceph cluster should be reachable from the Storage network as
-described in the [networking document](networking.md). The IPs and
-ports of the Ceph cluster's monitors should be in
-`/etc/ceph.conf`. From within the pod, read this and try to ping the
-IP as well as connect to the port.
+The Ceph cluster should be reachable from the Storage network as described in
+the [networking document](networking.md). The IPs and ports of the Ceph
+cluster's monitors should be in `/etc/ceph.conf`. From within the pod, read
+this and try to reach the IP as well as connect to the port.
 ```
-$ oc rsh -c glance-api glance-default-external-api-0
+$ oc debug --container glance-api pod/glance-default-external-api-0
 bash-5.1$ cat /etc/ceph/ceph.conf
 # minimal ceph.conf for 7fbaf2fd-f70e-5625-b00e-65b33ee823a6
 [global]
@@ -156,32 +166,11 @@ If you are unable to connect, then troubleshoot the network.
 3. Confirm you can read from the Ceph cluster
 
 If the Ceph cluster is reachable via the network, then try to use the
-`rbd` command to read from it. The `rbd` command is in Nova pods but
-not Glance or Cinder pods. The Nova containers which use the cephx key
-are hosted on Compute nodes, not OpenShift, and thus the NovaPods on
-OpenShift do not have access to the ceph files describe in step 1.
+`rbd` command to read from it.
 
-First update the `extraMounts` option described in the
-[Ceph integration documentation](ceph.md) so that the propagation
-list includes the NovaAPI service.
+**Note**
 
-```
-spec:
-  ...
-  extraMounts:
-    - name: v1
-      region: r1
-      extraVol:
-        - propagation:
-          - CinderVolume
-          - GlanceAPI
-          - NovaAPI
-```
-The above update will restart the NovaAPI pod. Connect to the
-restarted pod using `oc rsh` and confirm the required keys
-are present as described in step 1.
-
-Once connected to the NovaAPI pod with `oc rsh` examine the cephx key.
+Before running the rbd command, examine the cephx key.
 
 ```
 bash-5.1$ cat /etc/ceph/ceph.client.openstack.keyring
@@ -196,9 +185,9 @@ Observe a pool name from the OSD caps, e.g. the `images` pool is in
 the list of OSD caps. Try to list the contexts of that pool with the
 RBD command.
 ```
-/usr/bin/rbd --conf /etc/ceph/ceph.conf \
-             --keyring /etc/ceph/ceph.client.openstack.keyring
-             --cluster ceph --id openstack
+$ /usr/bin/rbd --conf /etc/ceph/ceph.conf \
+             --keyring /etc/ceph/ceph.client.openstack.keyring \
+             --cluster ceph --id openstack \
              ls -l -p images | wc -l
 ```
 If the above command returns an integer of 0 or greater, then the
@@ -230,8 +219,6 @@ below.
 # POOL=images
 # RBD="/usr/bin/rbd --conf /etc/ceph/ceph.conf --keyring /etc/ceph/ceph.client.openstack.keyring --cluster ceph --id openstack"
 # $RBD create --size 1024 $POOL/$DATA
-^C
-#
 ```
 If the above had succeeded, then the test data could be deleted with
 `$RBD rm $POOL/$DATA`.
