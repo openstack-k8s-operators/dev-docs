@@ -8,6 +8,7 @@ Developer Documentation related to podified controlplane.
 * [Implementation Guidelines](developer.md)
 * [Quickstart on writing KUTTL tests for an operator](kuttl_tests.md)
 * [Building operator images](image_build.md)
+* [Building custom OpenStack images](glance_image_build.md)
 * [Debugging operator via vscode](debugging.md)
 * [Testing local changes to lib-common](testing_lib_common.md)
 * [Running a local copy of an operator for development without conflicts](running_local_operator.md)
