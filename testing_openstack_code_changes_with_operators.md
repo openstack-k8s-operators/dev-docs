@@ -68,7 +68,7 @@ kind: PersistentVolumeClaim
 metadata:
   name: neutron-code-dev
 spec:
-  storageClassName: neutron-code-dev
+  storageClassName: neutron-code
   accessModes:
     - ReadOnlyMany
   resources:
@@ -101,7 +101,7 @@ spec:
             volumes:
             - name: neutron-code
               persistentVolumeClaim:
-                claimName: neutron-code
+                claimName: neutron-code-dev
                 readOnly: true
           name: neutron-code
 ```
