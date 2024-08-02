@@ -17,7 +17,7 @@ In order to complete the above procedure, the `services` list of the
 
 EDPM nodes can be configured by creating an
 `OpenStackDataPlaneNodeSet` CR which the
-[openstack-operator](https://openstack-k8s-operators.github.io/openstack-operator)
+[dataplane component of the openstack operator](https://openstack-k8s-operators.github.io/openstack-operator/dataplane/)
 will reconcile when an `OpenStackDataPlaneDeployment` CR is created.
 These types of CRs have a `services` list like the following:
 
@@ -27,14 +27,15 @@ kind: OpenStackDataPlaneNodeSet
 spec:
   ...
   services:
+    - bootstrap
     - configure-network
     - validate-network
     - install-os
+    - ceph-hci-pre
     - configure-os
+    - ssh-known-hosts
     - run-os
-    - ovn
-    - libvirt
-    - nova
+    - reboot-os
 ```
 Only the services which are on the list will be configured.
 
@@ -373,8 +374,9 @@ Though the Ceph cluster is physically co-located on the EDPM
 nodes, which will also host the compute services, it can be treated
 as if it is logically external. The [documentation](ceph.md) will
 cover how to configure the Control Plane and Data Plane to use
-Ceph. When configuring the Data Plane there are additional steps
-required when using HCI which are covered below.
+Ceph. Ensure that the services list is updated accordingly. When
+configuring the Data Plane there are additional steps required when
+using HCI which are covered below.
 
 ### Update the Data Plane CR
 
@@ -484,3 +486,75 @@ oc create -f openstackdataplanedeployment_pre_post_hci.yaml
 
 The HCI deployment should be complete after the Ansible jobs started
 from creating the above CR finish successfully.
+
+## Final OpenStackDataPlaneNodeSet services list
+
+It is important to restore the full `services` list in the
+`OpenStackDataPlaneNodeSet` so that during updates all required
+services are updated.
+
+Before Ceph was deployed the initial services list looked like this:
+
+```yaml
+apiVersion: dataplane.openstack.org/v1beta1
+kind: OpenStackDataPlaneNodeSet
+spec:
+  ...
+  services:
+    - bootstrap
+    - configure-network
+    - validate-network
+    - install-os
+    - ceph-hci-pre
+    - configure-os
+    - ssh-known-hosts
+    - run-os
+    - reboot-os
+```
+
+After Ceph was deployed the initial services list looked like this:
+
+```yaml
+apiVersion: dataplane.openstack.org/v1beta1
+kind: OpenStackDataPlaneNodeSet
+spec:
+  ...
+  services:
+    - install-certs
+    - ceph-client
+    - ovn
+    - neutron-metadata
+    - libvirt
+    - nova-custom-ceph
+```
+
+Now we need to update the final services list of the HCI nodes to
+combine both lists like this:
+
+```yaml
+apiVersion: dataplane.openstack.org/v1beta1
+kind: OpenStackDataPlaneNodeSet
+spec:
+  ...
+  services:
+    - bootstrap
+    - configure-network
+    - validate-network
+    - install-os
+    - ceph-hci-pre
+    - configure-os
+    - ssh-known-hosts
+    - run-os
+    - reboot-os
+    - install-certs
+    - ceph-client
+    - ovn
+    - neutron-metadata
+    - libvirt
+    - nova-custom-ceph
+```
+Updating the services list in a `OpenStackDataPlaneNodeSet` will not
+trigger another run of Ansible unless a new
+`OpenStackDataPlaneDeployment` is created. However, we want to make
+sure the `OpenStackDataPlaneNodeSet` has the complete list of services
+for future deployments.

@@ -329,13 +329,10 @@ spec:
     edpm-compute:
       ...
       services:
-        - configure-network
-        - validate-network
-        - install-os
-        - configure-os
-        - run-os
+        - install-certs
         - ceph-client
         - ovn
+        - neutron-metadata
         - libvirt
         - nova-custom-ceph
 ```
