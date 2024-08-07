@@ -149,17 +149,45 @@ the [networking document](networking.md). The IPs and ports of the Ceph
 cluster's monitors should be in `/etc/ceph.conf`. From within the pod, read
 this and try to reach the IP as well as connect to the port.
 ```
-$ oc debug --container glance-api pod/glance-default-external-api-0
-bash-5.1$ cat /etc/ceph/ceph.conf
-# minimal ceph.conf for 7fbaf2fd-f70e-5625-b00e-65b33ee823a6
+$ oc get pods | grep external-api-0
+glance-06f7a-default-external-api-0                               3/3     Running     0              2d3h
+$ oc debug --container glance-api glance-06f7a-default-external-api-0
+Starting pod/glance-06f7a-default-external-api-0-debug-p24v9, command was: /usr/bin/dumb-init --single-child -- /bin/bash -c /usr/local/bin/kolla_set_configs && /usr/local/bin/kolla_start
+Pod IP: 192.168.25.50
+If you don't see a command prompt, try pressing enter.
+sh-5.1# cat /etc/ceph/ceph.conf
+# Ansible managed
+
 [global]
-	fsid = 7fbaf2fd-f70e-5625-b00e-65b33ee823a6
-	mon_host = [v2:172.18.0.101:3300/0,v1:172.18.0.101:6789/0] [v2:172.18.0.102:3300/0,v1:172.18.0.102:6789/0] [v2:172.18.0.100:3300/0,v1:172.18.0.100:6789/0]
-bash-5.1$ nc -z -v 172.18.0.101 3300
-Ncat: Version 7.93 ( https://nmap.org/ncat )
-Ncat: Connected to 172.18.0.101:3300.
-Ncat: 0 bytes sent, 0 bytes received in 0.62 seconds.
-bash-5.1$
+
+fsid = 63bdd226-fbe6-5f31-956e-7028e99f1ee1
+mon host = [v2:192.168.122.100:3300/0,v1:192.168.122.100:6789/0],[v2:192.168.122.102:3300/0,v1:192.168.122.102:6789/0],[v2:192.168.122.101:3300/0,v1:192.168.122.101:6789/0]
+
+
+[client.libvirt]
+admin socket = /var/run/ceph/$cluster-$type.$id.$pid.$cctid.asok
+log file = /var/log/ceph/qemu-guest-$pid.log
+
+sh-5.1# python3
+Python 3.9.19 (main, Jul 18 2024, 00:00:00)
+[GCC 11.4.1 20231218 (Red Hat 11.4.1-3)] on linux
+Type "help", "copyright", "credits" or "license" for more information.
+>>> import socket
+>>> s = socket.socket()
+>>> ip="192.168.122.100"
+>>> port=3300
+>>> s.connect((ip,port))
+>>>
+```
+The above example uses a Python socket to connect to the IP and port
+from the `ceph.conf` of the ceph cluster. If `s.connect((ip,port))`
+does not hang and then return an error like the one below, then the
+network connection between the pod and the ceph cluster is functioning
+correctly.
+```
+Traceback (most recent call last):
+  File "<stdin>", line 1, in <module>
+TimeoutError: [Errno 110] Connection timed out
 ```
 If you are unable to connect, then troubleshoot the network.
 
