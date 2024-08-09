@@ -102,7 +102,113 @@ Follow the
 document](version_updates.md#custom-images-for-other-openstack-services)
 and use the URL to have OCP deploy the new image for testing.
 
-Once the image is published use a command like 
+Once the image is published use a command like
+`oc rsh --container glance-api glance-3d293-default-external-api-0`
+to get inside the new glance pod and then examine
+`/usr/lib/python3.9/site-packages/glance/location.py`
+to see if the patch was correctly applied.
+
+### Import the image in openshift-image-registry
+
+When the image is built using `tcib`, it is possible to use the `openshift-image-registry`
+to push it and build a new `ImageStream` that can be consumed by the `OpenStackControlPlane`
+through the `OpenStackVersion` approach described in the [OpenStackVersion custom-images
+document](version_updates.md#custom-images-for-other-openstack-services).
+To import the new local image in the `openshift-image-registry` run the following commands:
+
+1. Verify the openshift-image-registry project exists and there is an associated service:
+
+```bash
+$ oc get pods -n openshift-image-registry
+NAME                                               READY   STATUS      RESTARTS   AGE
+cluster-image-registry-operator-7769bd8d7d-4xwcp   1/1     Running     2          13h
+image-pruner-28719360-6pvb2                        0/1     Completed   0          11h
+image-registry-56f7846646-55tj4                    1/1     Running     0          11h
+node-ca-98n8x                                      1/1     Running     1          12h
+node-ca-jr5qn                                      1/1     Running     1          12h
+node-ca-x24kt                                      1/1     Running     1          12h
+
+$ oc get svc -n openshift-image-registry
+NAME                      TYPE        CLUSTER-IP     EXTERNAL-IP   PORT(S)     AGE
+image-registry            ClusterIP   172.30.80.87   <none>        5000/TCP    12h
+image-registry-operator   ClusterIP   None           <none>        60000/TCP   13h
+```
+
+2. To be able to push the local image using `podman`, expose the service through
+a public `Route`:
+
+```bash
+ oc patch configs.imageregistry.operator.openshift.io/cluster --patch '{"spec":{"defaultRoute":true}}' --type=merge
+```
+
+3. Verify the `openshift-image-registry` is reachable through a public `Route`:
+
+```bash
+$ oc get route -n openshift-image-registry
+NAME            HOST/PORT                                                       PATH   SERVICES         PORT    TERMINATION   WILDCARD
+default-route   default-route-openshift-image-registry.apps.ocp.openstack.lab          image-registry   <all>   reencrypt     None
+```
+
+**Note:**
+
+For more information about the `openshift-image-registry` management, follow the
+official [openshift guide](https://docs.openshift.com/container-platform/4.16/registry/securing-exposing-registry.html)
+
+4. Login to the exposed registry:
+
+```bash
+$ podman login -u kubeadmin -p $(oc whoami -t) default-route-openshift-image-registry.apps.ocp.openstack.lab
+```
+
+5. Tag and push the local image built using `tcib`:
+
+```bash
+$ podman tag quay.io/$USER/podified-master-centos9/openstack-glance-api:mytag image-registry.apps.ocp.openstack.lab/openstack/openstack-glance-api:mytag
+
+$ podman push default-route-openshift-image-registry.apps.ocp.openstack.lab/openstack/openstack-glance-api:mytag
+```
+
+**Note:**
+
+Append `--tls-verify=false` to the `podman` commands in case of issues with TLS cert verification
+
+6. Verify the new `ImageStream` is present in the `openstack` namespace:
+
+```bash
+$ oc get is
+NAME                   IMAGE REPOSITORY                                                                               TAGS              UPDATED
+openstack-glance-api   default-route-openshift-image-registry.apps.ocp.openstack.lab/openstack/openstack-glance-api   mytag,latest   24 minutes ago
+```
+
+7. (Optional) Remove the `Route` from the `openshift-image-registry` as we import the image
+using the internal `Service`
+
+```bash
+ oc patch configs.imageregistry.operator.openshift.io/cluster --patch '{"spec":{"defaultRoute":false}}' --type=merge
+```
+
+8. Get the image address in the form of `registry:<port>/<project>/<image>`:
+
+```bash
+$ oc get is openstack-glance-api -o json | jq '.status.dockerImageRepository'
+
+"image-registry.openshift-image-registry.svc:5000/openstack/openstack-glance-api"
+```
+
+You can refer the image via sha by changing the above to match `dockerImageReference`, for example:
+
+```bash
+$ oc get is openstack-glance-api -o json | jq '.status.tags[1] | .items[0] | .dockerImageReference'
+"image-registry.openshift-image-registry.svc:5000/openstack/openstack-glance-api@sha256:a36a9ae074dc3ea0674b88351589c0a84bd264d30ef62a0c42bab5081c0d3b4c"
+```
+
+Follow the
+[OpenStackVersion custom-images
+document](version_updates.md#custom-images-for-other-openstack-services)
+and use the retrieved image URL (either image:tag or using the sha reference)
+to have OCP deploy the new image for testing.
+
+Once the image is published use a command like
 `oc rsh --container glance-api glance-3d293-default-external-api-0`
 to get inside the new glance pod and then examine
 `/usr/lib/python3.9/site-packages/glance/location.py`
