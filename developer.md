@@ -184,3 +184,29 @@ for the `PasswordSelectors` field will be used. But when the
 `passwordSelectors` field is in the input but only defines the `database` field
 but not the `service` then the default defiened at `Service` field will be
 used.
+
+## CRD fields with omitempty
+
+Some fields omited from serialization using the `omitempty` marker,
+thus sparing time that would have to be used for encoding them.
+By marking field with omitempty, it will not be encoded, if it contains
+value defined as empty. This value is type dependent, for example `0` for integers,
+or nil for pointers.[0]
+
+It is necessary for the operator code to expect this behavior,
+and special care must be taken when it comes to omitting pointers. 
+All pointer fields marked as `omitempty` must be checked if they are not nil before use.
+
+When used in conjuction with `Optional` kubebuilder validation, the field
+has to be assumed to be empty by default and treated as such.
+Pointers to booleans and integers can be especially tricky in cases like this.
+Checks for nil value must be implemented before the field is used.
+Since it may happen that their empty value, that is false or 0, is actually meaningful.
+Then the optional field may be set to value of nil pointer.
+
+The `omitempty` should therefore only be used on cases when one deals with
+pointers in general, or pointers to structs specifically.
+All other types do not benefit from being omitted.
+
+[0] https://pkg.go.dev/encoding/json#Marshal
+[1] https://github.com/kubernetes/community/blob/master/contributors/devel/sig-architecture/api-conventions.md#optional-vs-required
