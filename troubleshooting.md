@@ -79,6 +79,30 @@ check the logs of that job.
 oc logs -n openstack job/telemetry-edpm-deployment-ipam-openstack-edpm-ipam
 ```
 
+You can also use `oc debug` to debug the failing job and interactively execute
+ansible.
+```sh
+oc debug --as-root --keep-annotations job/telemetry-edpm-deployment-ipam-openstack-edpm-ipam
+```
+Once in the debug environment, `edpm-entrypoint` must be used to execute
+`ansible-runner`. The `ansible-runner` working directory is `/runner`. The
+`edpm-ansible` ansible collection is installed at
+`/usr/share/ansible/collections/ansible_collections/osp/edpm`.
+```sh
+/bin/edpm-entrypoint ansible-runner run /runner -p osp.edpm.telemetry -i telemetry-edpm-deployment-ipam-openstack-edpm-ipam
+```
+
+If needed, changes can be made to affect the ansible execution for debugging
+purposes. The following shows an example of modifying the inventory.
+```sh
+cp /runner/inventory/hosts /root/inventory
+microdnf -y install vim
+# modify inventory
+# vim /root/inventory
+# use modified inventory
+/bin/edpm-entrypoint ansible-runner run /runner -p osp.edpm.telemetry -i telemetry-edpm-deployment-ipam-openstack-edpm-ipam --inventory /root/inventory
+```
+
 ## Crashing Pods
 
 Certain problems in the deployment can cause Pods to crash and terminate
