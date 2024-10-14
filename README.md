@@ -21,6 +21,7 @@ Developer Documentation related to podified controlplane.
 * [Test strategy](test_strategy.md)
 * [Strategy to provide files to services](extra_mounts.md)
 * [Ceph](ceph.md)
+* [Rook](rook.md)
 * [Hyperconverged Infrastructure](hci.md)
 * [Service config and bootstrap](service_config.md)
 * [Overview of Writing EDPM services](edpm_service_overview.md)
