@@ -311,7 +311,7 @@ You can disable the webhooks if you don't need them for your local dev/testing p
 1. If you installed the operator via OLM, remove its webhook definitions from its CSV:
 
 ```bash
-oc patch csv -n openstack-operators <your operator CSV> --type=json -p="[{'op': 'remove', 'path': '/spec/webhookdefinitions'}]"
+oc patch csv -n openstack-operators <your operator CSV> --type=json -p="[{'op': 'replace', 'path': '/spec/webhookdefinitions', 'value': []}]"
 ```
 
 2. Run the operator locally with the webhook server disabled:
@@ -328,7 +328,7 @@ Webhooks can be used outside of an OLM context if you want or need them.  Howeve
 1. First, if you installed the operator via OLM, remove its webhook definitions from its CSV:
 
 ```bash
-oc patch csv -n openstack-operators <your operator CSV> --type=json -p="[{'op': 'remove', 'path': '/spec/webhookdefinitions'}]"
+oc patch csv -n openstack-operators <your operator CSV> --type=json -p="[{'op': 'replace', 'path': '/spec/webhookdefinitions', 'value': []}]"
 ```
 
 2. Now execute the `make` target to run the operator locally with webhooks enabled:
