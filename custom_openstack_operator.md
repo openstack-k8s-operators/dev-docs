@@ -74,6 +74,8 @@ $ tail -1 apis/go.mod
 replace github.com/openstack-k8s-operators/keystone-operator/api => github.com/abays/keystone-operator/api v0.0.0-20241024164030-114f7d6488b9
 ```
 
+Do not forget to run `make tidy` to guarantee that the `go.sum` files will be correctly updated.
+
 ### 3. Build your custom OpenStack Operator
 
 1. If your GitHub username is NOT the same as your Quay username, you will need to add the following
@@ -98,6 +100,8 @@ index 57b35d7..eb47338 100755
 ```
 
 2. Build the custom OpenStack operator (this will take a few minutes)
+
+Do not forget to login to your Quay account with `podman login` before running the command below.
 
 ```bash
 $ IMAGE_TAG_BASE=quay.io/andrewbays/openstack-operator VERSION=0.0.1 IMG=$IMAGE_TAG_BASE:v$VERSION make manifests build docker-build docker-push bundle bundle-build bundle-push catalog-build catalog-push
