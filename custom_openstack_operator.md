@@ -62,6 +62,8 @@ Change this to suit your purposes.
 
 Also notice the returned version ID: `vX.X.X-<timestamp>-<commit ID>`
 
+Note: As an alternative to this step, the replace lines can be added to the `go.mod` files using the commit. Running the `make tidy` afterwards will replace it with the version ID.
+
 2. Modify your OpenStack operator `go.mod` files (both at the root dir and the `apis` dir) to include a
 `replace` that uses your custom service operator version (do this via your IDE, the output below just
 shows the aftermath)
@@ -78,34 +80,16 @@ Do not forget to run `make tidy` to guarantee that the `go.sum` files will be co
 
 ### 3. Build your custom OpenStack Operator
 
-1. If your GitHub username is NOT the same as your Quay username, you will need to add the following
-hack to your OpenStack operator's `hack/pin-bundle-images.sh`:
-
-```bash
-$ git diff hack/pin-bundle-images.sh
-diff --git a/hack/pin-bundle-images.sh b/hack/pin-bundle-images.sh
-index 57b35d7..eb47338 100755
---- a/hack/pin-bundle-images.sh
-+++ b/hack/pin-bundle-images.sh
-@@ -40,6 +40,9 @@ for MOD_PATH in ${MOD_PATHS}; do
-     fi
- 
-     GITHUB_USER=$(echo $MOD_PATH | sed -e 's|github.com/\(.*\)/.*-operator/.*$|\1|')
-+    if [ "$GITHUB_USER" == "<your GitHub username>" ]; then
-+        GITHUB_USER=<your Quay username>
-+    fi
-     CURL_REGISTRY="quay.io"
-     REPO_CURL_URL="https://${CURL_REGISTRY}/api/v1/repository/openstack-k8s-operators"
-     REPO_URL="${CURL_REGISTRY}/openstack-k8s-operators"
-```
-
-2. Build the custom OpenStack operator (this will take a few minutes)
+Build the custom OpenStack operator (this will take a few minutes)
 
 Do not forget to login to your Quay account with `podman login` before running the command below.
 
 ```bash
 $ IMAGE_TAG_BASE=quay.io/andrewbays/openstack-operator VERSION=0.0.1 IMG=$IMAGE_TAG_BASE:v$VERSION make manifests build docker-build docker-push bundle bundle-build bundle-push catalog-build catalog-push
 ```
+
+Note: If your GitHub username is NOT the same as your Quay username add `IMAGENAMESPACE=<your Quay username>`
+also to the list of environment variables at the beginning of the command.
 
 Notice the `IMAGE_TAG_BASE` and `VERSION` variables: `quay.io/<your Quay username>/openstack-operator`
 and `X.X.X`, respectively.  Use your Quay username and choose an arbitrary version, such as `0.0.1`.  If
