@@ -89,7 +89,7 @@ Once in the debug environment, `edpm-entrypoint` must be used to execute
 `edpm-ansible` ansible collection is installed at
 `/usr/share/ansible/collections/ansible_collections/osp/edpm`.
 ```sh
-/bin/edpm-entrypoint ansible-runner run /runner -p osp.edpm.telemetry -i telemetry-edpm-deployment-ipam-openstack-edpm-ipam
+/opt/builder/bin/edpm_entrypoint ansible-runner run /runner -p osp.edpm.telemetry -i telemetry-edpm-deployment-ipam-openstack-edpm-ipam
 ```
 
 If needed, changes can be made to affect the ansible execution for debugging
@@ -100,7 +100,7 @@ microdnf -y install vim
 # modify inventory
 # vim /root/inventory
 # use modified inventory
-/bin/edpm-entrypoint ansible-runner run /runner -p osp.edpm.telemetry -i telemetry-edpm-deployment-ipam-openstack-edpm-ipam --inventory /root/inventory
+/opt/builder/bin/edpm_entrypoint ansible-runner run /runner -p osp.edpm.telemetry -i telemetry-edpm-deployment-ipam-openstack-edpm-ipam --inventory /root/inventory
 ```
 
 ## Crashing Pods
