@@ -9,7 +9,7 @@ What is it good for:
   in the test that in production.
 * Testing both happy and failure scenarios. You can simulate that a Job fails
   or that KeystoneAPI is not Ready. You can define order of external state
-  changes, e.g. TransportURL becomes ready before MariaDBDatabase
+  changes, e.g. TransportURL becomes ready before MariaDBDatabase.
 * Testing at every commit or even at every local changes you make as single
   test cases can be run in seconds and full suites can run in a minute.
 * Reproducing failures for debugging. If you know the sequence of events that
@@ -19,7 +19,7 @@ What is it good for:
 
 What it is not good for:
 * Testing integration between different operators as only your operator runs
-  in the test environment
+  in the test environment.
 * Testing the integration between an operator and k8s. You can assert if
   your operator created k8s resources properly but those resources will not be
   reconciled so you cannot assert k8s behavior.
@@ -39,21 +39,21 @@ While kuttl seems to be a good choice for integration testing multiple
 operators in a single environment to ensure that the happy path works, it has a
 list of trade offs using it for testing a single operator:
 * kuttl will be significantly slower than envtest as it needs every operator to
-  to start and reconcile. Also it needs to wait for all the external events to
+  start and reconcile. Also it needs to wait for all the external events to
   happen E.g. Jobs to finish, DBs to be created etc.
 * kuttl will need a full k8s / OCP environment so that all the operators
   including OCP and k8s can run. This will require more CPU and Memory
-  than EnvTest. For example I can run 4 parallel EnvTest execution in a local
-  laptop but only a single all in one OCP fits into a laptop.
+  than EnvTest. For example, I can run 4 parallel EnvTest executions in a local
+  laptop, but only a single all in one OCP fits into a laptop.
 * kuttl works based on matching yaml files. There is no built in support for
   integer comparison or regexp match. You need to call out to bash for that
   which breaks up the test case to different files and different languages.
   EnvTest test cases are written in golang so it can use the whole golang
   ecosystem to implement test logic.
-* with kuttl is is hard or even impossible to simulate failure scenarios. E.g.
+* with kuttl, it is hard or even impossible to simulate failure scenarios. E.g.
   simulating that KeystoneAPI is not Ready needs some way to "break" the
   configuration of the keystone deployment.
-* debugging with kuttl is hard as you cannot put a breakpoint in the test code
+* debugging with kuttl is hard as you cannot put a breakpoint in the test code.
 
 ## Test env architecture
 ```
@@ -128,19 +128,19 @@ var _ = Describe("NovaAPI controller", func() {
 
 #### Why BDD and not pure unit test style?
 
-There is no technical reasons. You can use EnvTest (and Gomega) with the pure
+There are no technical reasons. You can use EnvTest (and Gomega) with the pure
 golang unit test framework or [testify](https://github.com/stretchr/testify).
 See a trial
 [here](https://github.com/gibizer/nova-operator/compare/7d5e6ef068f18192e45830582e8d56ce4c185576...363289bd24738c320314717219e12d6550c42bf9).
-The reason we ended up with ginkgo and BDD is that all the examples in
-kubebuilder and operator sdk docs are using ginkgo.
+The reason we ended up with Ginkgo and BDD is that all the examples in
+kubebuilder and Operator SDK docs are using Ginkgo.
 
 ### Simulating k8s dependencies
 
 In EnvTest your operator is running in isolation, so the test code needs to
 simulate the other operators and OCP / k8s behaviors the operator under test
 depends on. For example nova-operator needs a k8s Service to exists that
-represents a running mariadb service to create nova's DB instances. But there
+represents a running MariaDB service to create nova's DB instances. But there
 is no mariadb-operator running in the test environment and nothing has created
 the MariaDB CR, so no Service resource exists. Fortunately creating CR or a k8s
 resource from the test code is simple:
@@ -289,7 +289,7 @@ Here is an example launch configuration for vscode:
 ```
 
 Note that you at least needs to run the test with the make target to get the
-binaries downloaded to the local ./bin folder.
+binaries downloaded to the local ```./bin``` folder.
 
 ### Debug with delve
 You can also use the command line debugger to debug the envtest execution:
@@ -309,11 +309,11 @@ add a prow job to run that make target for every PR. See for the
 
 Tips and tricks for improving the efficiency and organization of your Ginkgo tests:
 
-1. To avoid duplicating general test setup code, utilize Ginkgo's global `BeforeEach` and `AfterEach` functions. These should be placed in the [top-level suite](https://github.com/openstack-k8s-operators/nova-operator/blob/main/test/functional/suite_test.go#L237) to ensure consistent setup and teardown across all tests. This BeforeEach can be combined with [`BeforeEach`](https://github.com/openstack-k8s-operators/nova-operator/blob/main/test/functional/nova_multicell_test.go#L100) in any test lvl. More `BeforeEach` and `Context` [here](https://onsi.github.io/ginkgo/#shared-behaviors)
+1. To avoid duplicating general test setup code, utilize Ginkgo's global `BeforeEach` and `AfterEach` functions. These should be placed in the [top-level suite](https://github.com/openstack-k8s-operators/nova-operator/blob/main/test/functional/suite_test.go#L237) to ensure consistent setup and teardown across all tests. This BeforeEach can be combined with [`BeforeEach`](https://github.com/openstack-k8s-operators/nova-operator/blob/main/test/functional/nova_multicell_test.go#L100) in any test lvl. More `BeforeEach` and `Context` [here](https://onsi.github.io/ginkgo/#shared-behaviors).
 
 2. When using envtest, create a unique namespace for each test run. This is necessary because namespaces cannot be deleted in a locally running envtest. For more information, refer to the [Kubebuilder documentation](https://book.kubebuilder.io/reference/envtest.html#namespace-usage-limitation) on namespace usage limitation.
 
-3. Use Ginkgo's table. Entry functionality to reduce the number of individual tests. By consolidating multiple test cases into a table, you can streamline your test suite and improve readability. Remember that if you want to use anything that is initialized in in `BeforeEach` ginkgo doesn’t know about it during [Spec traversing](https://github.com/onsi/ginkgo/issues/378). This augmenting issue can be avoided by similar patterns like [here](https://github.com/openstack-k8s-operators/nova-operator/blob/e07bd0cfbd9df09a208b64a97a943b752f416b1e/test/functional/nova_reconfiguration_test.go#L367).
+3. Use Ginkgo's table entry functionality to reduce the number of individual tests. By consolidating multiple test cases into a table, you can streamline your test suite and improve readability. Remember that if you want to use anything that is initialized in `BeforeEach`, ginkgo doesn’t know about it during [Spec traversing](https://github.com/onsi/ginkgo/issues/378). This augmenting issue can be avoided by similar patterns like [here](https://github.com/openstack-k8s-operators/nova-operator/blob/e07bd0cfbd9df09a208b64a97a943b752f416b1e/test/functional/nova_reconfiguration_test.go#L367).
 
 4. Please avoid using hardcoded paths; instead, try adopting a similar approach as demonstrated in this [example](https://github.com/openstack-k8s-operators/nova-operator/commit/3ab489b1f59f7bf9fe6efdc72fbe058c65732318).
 
