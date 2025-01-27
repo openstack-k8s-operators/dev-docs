@@ -304,14 +304,36 @@ If you would like to run the operator locally, extra steps must be taken to eith
 
 Before following either section below, make sure you're pointing to a valid `KUBECONFIG` or have otherwise used `oc` to log into your cluster.
 
+**NOTE for FR2 and later:** These options only work if the operator you wish to run locally has been installed individually via OLM.  If it was installed via the
+OpenStack operator, this does not work (unless, of course, you're trying to run the OpenStack operator itself locally, which is fine).
+
 ### Disabling webhooks
 
 You can disable the webhooks if you don't need them for your local dev/testing purposes.  The procedure is as follows:
+
+**FR1 and earlier**
 
 1. If you installed the operator via OLM, remove its webhook definitions from its CSV:
 
 ```bash
 oc patch csv -n openstack-operators <your operator CSV> --type=json -p="[{'op': 'replace', 'path': '/spec/webhookdefinitions', 'value': []}]"
+```
+
+**FR2 and later**
+
+1. If this is a service operator (i.e. is not OpenStack operator) installed via OLM, remove its webhook definitions from its CSV:
+
+```bash
+oc patch csv -n openstack-operators <your operator CSV> --type=json -p="[{'op': 'replace', 'path': '/spec/webhookdefinitions', 'value': []}]"
+```
+
+If instead you're trying to run the OpenStack operator locally, scale-down its CSV's deployment `replicas` to 0 and delete its webhooks manually:
+
+```bash
+oc patch csv -n openstack-operators <OpenStack operator CSV> --type json \
+  -p="[{"op": "replace", "path": "/spec/install/spec/deployments/0/spec/replicas", "value": "0"}]"
+oc delete mutatingwebhookconfiguration -l app.kubernetes.io/created-by=openstack-operator
+oc delete validatingwebhookconfiguration -l app.kubernetes.io/created-by=openstack-operator
 ```
 
 2. Run the operator locally with the webhook server disabled:
@@ -325,10 +347,29 @@ ENABLE_WEBHOOKS=false GOWORK= OPERATOR_TEMPLATES=./templates make run
 
 Webhooks can be used outside of an OLM context if you want or need them.  However, using webhooks locally is non-trivial and is best handled by adding something like [this](https://github.com/openstack-k8s-operators/cinder-operator/pull/155/files) to the operator itself (as mentioned in the [Adding webhooks to an operator](#adding-webhooks-to-an-operator) section above).  This doc will only cover that use case for the time being.  Thus, do the following to use webhooks locally where the aforementioned support is present:
 
+**FR1 and earlier**
+
 1. First, if you installed the operator via OLM, remove its webhook definitions from its CSV:
 
 ```bash
 oc patch csv -n openstack-operators <your operator CSV> --type=json -p="[{'op': 'replace', 'path': '/spec/webhookdefinitions', 'value': []}]"
+```
+
+**FR2 and later**
+
+1. First, if this is a service operator (i.e. is not OpenStack operator) installed via OLM, remove its webhook definitions from its CSV:
+
+```bash
+oc patch csv -n openstack-operators <your operator CSV> --type=json -p="[{'op': 'replace', 'path': '/spec/webhookdefinitions', 'value': []}]"
+```
+
+If instead you're trying to run the OpenStack operator locally, scale-down its CSV's deployment `replicas` to 0 and delete its webhooks manually:
+
+```bash
+oc patch csv -n openstack-operators <OpenStack operator CSV> --type json \
+  -p="[{"op": "replace", "path": "/spec/install/spec/deployments/0/spec/replicas", "value": "0"}]"
+oc delete mutatingwebhookconfiguration -l app.kubernetes.io/created-by=openstack-operator
+oc delete validatingwebhookconfiguration -l app.kubernetes.io/created-by=openstack-operator
 ```
 
 2. Now execute the `make` target to run the operator locally with webhooks enabled:

@@ -9,12 +9,22 @@ However, the operator deployed by the meta operator (from when you
 ran `make openstack`) will conflict with your local copy. E.g. both
 operators might try to resolve the same CR.
 
+**FR1 and earlier**
+
 To avoid the conflict, scale down the operator deployed by the meta
 operator by either setting its controller-manager pod replicas to 0
 or removing the deployment from the CSV entirely so that only your
 local operator will resolve its CR.
 
-## Disabling a service within the CSV
+**FR2 and later**
+
+To avoid the conflict, scale down the OpenStack operator CSV's deployment
+`replicas` to 0 and then scale down the associated service operator deployment
+`replicas` to 0 as well.
+
+## Disabling a service
+
+**FR1 and earlier**
 
 1. Backup the operator's CSV in case you want to restore it later:
 
@@ -45,7 +55,23 @@ oc patch csv -n openstack-operators <your operator CSV> --type json \
 oc patch csv -n openstack-operators <your operator CSV> --type=merge --patch-file=operator_csv.json
 ```
 
-## An Alternative Approach Provided by ChatGPT
+**FR2 and later**
+
+1. Drop the OpenStack operator's CSV's deployment `replicas` to 0
+
+```bash
+oc patch csv -n openstack-operators <OpenStack operator CSV> --type json \
+  -p="[{"op": "replace", "path": "/spec/install/spec/deployments/0/spec/replicas", "value": "0"}]"
+```
+
+2. Drop the service operator's deployment `replicas` to 0
+
+```bash
+oc patch deployment -n openstack-operators <service operator deployment> --type json \
+  -p="[{"op": "replace", "path": "/spec/replicas", "value": "0"}]"
+```
+
+## An Alternative Approach Provided by ChatGPT (FR1 and earlier)
 
 In Kubernetes, CSV (Cluster Service Version) is a Custom Resource Definition (CRD) that enables the operator to manage the lifecycle of a specific application in a Kubernetes cluster. The CSV defines the deployment strategy, dependencies, and upgrade paths for the application.
 
