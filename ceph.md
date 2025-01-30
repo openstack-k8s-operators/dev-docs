@@ -51,9 +51,9 @@ Create a cephx key which OpenStack can use to access the pools.
 ```shell
 cephadm shell -- \
    ceph auth add client.openstack \
-     mgr 'allow rw' \
-	 mon 'allow r' \
-	 osd 'allow class-read object_prefix rbd_children, allow rwx pool=vms, allow rwx pool=volumes, allow rwx pool=images'
+     mgr 'allow *' \
+	 mon 'profile rbd' \
+	 osd 'profile rbd pool=vms, profile rbd pool=volumes, profile rbd pool=images'
 ```
 If Manila is enabled in the OpenStack controlplane, then add `allow
 rwx pool=cephfs.cephfs.meta, allow rwx pool=cephfs.cephfs.data` to the
