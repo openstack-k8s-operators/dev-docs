@@ -49,7 +49,7 @@ $ git add .gitignore && git commit -m "update .gitignore"
 
 ```
 diff --git a/Makefile b/Makefile
-index 49afd68..091de81 100644
+index 5676e7b..6225584 100644
 --- a/Makefile
 +++ b/Makefile
 @@ -29,7 +29,7 @@ BUNDLE_METADATA_OPTS ?= $(BUNDLE_CHANNELS) $(BUNDLE_DEFAULT_CHANNEL)
@@ -61,30 +61,30 @@ index 49afd68..091de81 100644
  
  # BUNDLE_IMG defines the image:tag used for the bundle.
  # You can use it as an arg. (E.g make bundle-build BUNDLE_IMG=<some-registry>/<project-name-bundle>:<tag>)
-@@ -118,11 +118,11 @@ run: manifests generate fmt vet ## Run a controller from your host.
- 
+@@ -124,11 +124,11 @@ run: manifests generate fmt vet ## Run a controller from your host.
+ # More info: https://docs.docker.com/develop/develop-images/build_enhancements/
  .PHONY: docker-build
  docker-build: test ## Build docker image with the manager.
--       docker build -t ${IMG} .
-+       podman build -t ${IMG} .
+-	docker build -t ${IMG} .
++	podman build -t ${IMG} .
  
  .PHONY: docker-push
  docker-push: ## Push docker image with the manager.
--       docker push ${IMG}
-+       podman push ${IMG}
+-	docker push ${IMG}
++	podman push ${IMG}
  
- ##@ Deployment
- 
-@@ -185,7 +185,7 @@ bundle: manifests kustomize ## Generate bundle manifests and metadata, then vali
+ # PLATFORMS defines the target platforms for  the manager image be build to provide support to multiple
+ # architectures. (i.e. make docker-buildx IMG=myregistry/mypoperator:0.0.1). To use this option you need to:
+@@ -233,7 +233,7 @@ bundle: manifests kustomize operator-sdk ## Generate bundle manifests and metada
  
  .PHONY: bundle-build
  bundle-build: ## Build the bundle image.
--       docker build -f bundle.Dockerfile -t $(BUNDLE_IMG) .
-+       podman build -f bundle.Dockerfile -t $(BUNDLE_IMG) .
+-	docker build -f bundle.Dockerfile -t $(BUNDLE_IMG) .
++	podman build -f bundle.Dockerfile -t $(BUNDLE_IMG) .
  
  .PHONY: bundle-push
  bundle-push: ## Push the bundle image.
-@@ -213,7 +213,7 @@ endif
+@@ -261,7 +261,7 @@ endif
  BUNDLE_IMGS ?= $(BUNDLE_IMG)
  
  # The image tag given to the resulting catalog image (e.g. make catalog-build CATALOG_IMG=example.com/operator-catalog:v0.2.0).
@@ -93,18 +93,17 @@ index 49afd68..091de81 100644
  
  # Set CATALOG_BASE_IMG to an existing catalog image tag to add $BUNDLE_IMGS to that image.
  ifneq ($(origin CATALOG_BASE_IMG), undefined)
-@@ -225,9 +225,44 @@ endif
+@@ -273,9 +273,43 @@ endif
  # https://github.com/operator-framework/community-operators/blob/7f1438c/docs/packaging-operator.md#updating-your-existing-operator
  .PHONY: catalog-build
  catalog-build: opm ## Build a catalog image.
--       $(OPM) index add --container-tool docker --mode semver --tag $(CATALOG_IMG) --bundles $(BUNDLE_IMGS) $(FROM_INDEX_OPT)
-+       $(OPM) index add --container-tool podman --mode semver --tag $(CATALOG_IMG) --bundles $(BUNDLE_IMGS) $(FROM_INDEX_OPT)
+-	$(OPM) index add --container-tool docker --mode semver --tag $(CATALOG_IMG) --bundles $(BUNDLE_IMGS) $(FROM_INDEX_OPT)
++	$(OPM) index add --container-tool podman --mode semver --tag $(CATALOG_IMG) --bundles $(BUNDLE_IMGS) $(FROM_INDEX_OPT)
  
  # Push the catalog image.
  .PHONY: catalog-push
  catalog-push: ## Push a catalog image.
-        $(MAKE) docker-push IMG=$(CATALOG_IMG)
-+
+ 	$(MAKE) docker-push IMG=$(CATALOG_IMG)
 +
 +# CI tools repo for running tests
 +CI_TOOLS_REPO := https://github.com/openstack-k8s-operators/openstack-k8s-operators-ci
