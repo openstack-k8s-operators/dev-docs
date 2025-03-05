@@ -84,8 +84,16 @@ Build the custom OpenStack operator (this will take a few minutes)
 
 Do not forget to login to your Quay account with `podman login` before running the command below.
 
+**FR1 and earlier**
+
 ```bash
 $ IMAGE_TAG_BASE=quay.io/andrewbays/openstack-operator VERSION=0.0.1 IMG=$IMAGE_TAG_BASE:v$VERSION make manifests build docker-build docker-push bundle bundle-build bundle-push catalog-build catalog-push
+```
+
+**FR2 and later**
+
+```bash
+$ IMAGE_TAG_BASE=quay.io/andrewbays/openstack-operator VERSION=0.0.1 IMG=$IMAGE_TAG_BASE:v$VERSION make manifests bindata build docker-build docker-push bundle bundle-build bundle-push catalog-build catalog-push
 ```
 
 Note: If your GitHub username is NOT the same as your Quay username add `IMAGENAMESPACE=<your Quay username>`
@@ -110,17 +118,25 @@ $ make openstack_cleanup
 2. Deploy your custom OpenStack operator that includes your custom service operator changes
 
 ```bash
-$ OPENSTACK_IMG=quay.io/andrewbays/openstack-operator-index:v0.0.1 make openstack
+$ OPENSTACK_IMG=quay.io/andrewbays/openstack-operator-index:v0.0.1 make openstack_wait
 ```
 
 Notice the URI format of the `OPENSTACK_IMG` variable: `quay.io/<your Quay username>/openstack-operator-index:v<your custom version tag>`.
 Use your Quay username and the version you specified via `VERSION` when you built your custom OpenStack operator.
 
-Within a few minutes, your custom OpenStack operator and custom service operators(s) will be available for use.
+### 5. Initialize OpenStack Operator (FR2 and later only)
 
-### 5. Create OpenStack Operator CRs
+Within a few minutes, your custom OpenStack operator will be ready for initialization.  Now that the OpenStack Operator is installed,
+it needs to be initialized to deploy all of the service operators.
 
-Now you can create an `OpenStackControlPlane` CR, for instance, and test the changes in your custom service operator.
+```bash
+make openstack_init
+```
+
+### 6. Create OpenStack Operator CRs
+
+Once all of the operators are installed, you can create an `OpenStackControlPlane` CR, for instance, and test the changes in
+your custom service operator.
 
 ```bash
 $ make openstack_deploy
