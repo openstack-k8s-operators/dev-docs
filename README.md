@@ -29,3 +29,4 @@ Developer Documentation related to podified controlplane.
 * [Troubleshooting](troubleshooting.md)
 * [FIPS](fips.md)
 * [Bumping dependencies](bumping_dependencies.md)
+* [Adding shell commands in pod containers](adding_shell_commands.md)
