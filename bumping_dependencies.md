@@ -1,6 +1,78 @@
-# Bumping dependencies
+# Bumping openstack-k8s-operator dependencies
 
-If you have backward incompatible changes in any of the operators `/api`
+The dependencies for all openstack-k8s-operators currently use
+[psuedo-versions](https://go.dev/ref/mod#pseudo-versions). This includes the
+dependencies for lib-common and all operator* repositories under the
+openstack-k8s-operators github org.
+
+## bumping all dependencies in a local operator repo
+
+Each operator has a Makefile target called 'make force-bump'. Running this
+target will bump the dependencies for all openstack-k8s-operator dependencies
+in one step. After running this step if there are struct changes you may need
+to re-run 'make manifests generate' to apply them. If you are using the
+openstack-operator then you would also need to run a 'make bindata' step last
+to update all the cached bindata files for the OpenStack initialization resource
+(see more on this below).
+
+If you prefer you can also manually update a single dependency using a command
+like:
+```
+go get github.com/openstack-k8s-operators/glance-operator/api@main
+```
+
+## github actions to automatically bump dependencies
+
+There are two github action workflows that can be used to automate bumping
+dependencies for each operator repository:
+
+- "Manually Trigger a Force Bump PR" action workflow can be executed on demand
+to create or update a pull request that bumps operator dependencies for the
+selected branch. NOTE: this action only runs if the workflow exists on that
+branch (main and FR3 going forward)
+
+- "Scheduled Force Bump PR" action workflow is executed automatically on
+weekends. The actions run across the repositories in stages, a couple of pull
+requests are generated each hour (so as not to overburden CI all at once). This
+workflow runs on both the 'main' and last 'feature release' branches.
+
+If there are failures or issues with the above you can manage and inspect the
+github workflow executions in the 'actions' tab of each operator repo.
+
+## special things about openstack-operator
+
+OpenStack operator is our meta-operator and is responsible for installing all
+other operators for the product via an initialization resource. In addition to
+normal operator dependency bumps described above the following conventions and
+considerations should be made:
+
+- always run 'make bindata' after making any dependency changes to
+openstack-operator or promoting the dependencies for any service operator within
+openstack-operator. This needs to be in sync as openstack-operator is responsible
+for creating the CRDs for all other service operators in the product. The bindata
+files get built into the openstack-operator container directly (not the bundle).
+This pattern is different than normal operator-sdk projects in that CRDs often
+got installed by OLM directly there and this is no longer the case.
+
+- we are using the go.mod file psuedoversion for each operator as the tag/pin for
+each operator's controller-manager container. This is a convention that is used
+upstream only on both 'main' and the 'feature release' branches. This means when
+you bump the dependency of a service operator (keystone-operator, or
+glance-operator, etc) in the openstack-operator project you are also bumping the
+dependency of the service operator controller-manager container artifact. This works
+because we tag all container images with the psuedoversion and thus can always find
+the correct container image. When 'make bindata' executes it syncronizes all the
+RELATED\_IMAGE variables to point to the correct container images accordinly using
+the appropriate [sha/digest](https://github.com/openstack-k8s-operators/openstack-operator/blob/main/config/operator/manager_operator_images.yaml)
+so that offline airgapped testing is also fully supported upstream.
+
+# Backwards incompatible shared golang function changes
+
+NOTE: this applies to golang functions only not to API structs. There should
+be no backwards incompatible golang struct changes that would break
+existing deployments.
+
+If you have backward incompatible function changes in any of the operators `/api`
 modules, (e.g. changing the signature of a function in `/api` called by other
 operators) then you need to land this changes in the dependency order of our
 operators. See [OperatorDependencyBumpOrder](https://github.com/gibizer/openstack-k8s-status/blob/main/OperatorDependencyBumpOrder.md).
@@ -78,6 +150,3 @@ target now.
 
 3. Bump the golangci-lint version in the ` .pre-commit-config.yaml` in each
 repository to the newest version that supports the new golang version.
-
-4. While test-operator is not part of the openstack-operator bundle it make
-sense to do the same version bumps in the repo as well.
