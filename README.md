@@ -31,3 +31,4 @@ Developer Documentation related to podified controlplane.
 * [FIPS](fips.md)
 * [Bumping dependencies](bumping_dependencies.md)
 * [Adding shell commands in pod containers](adding_shell_commands.md)
+* [Hotfix process - Building custom OpenStack Images](hotfix_process.md)
