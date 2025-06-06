@@ -139,7 +139,7 @@ spec:
     glanceAPIImage: <custom image URL location>
 ```
 
-## ordering of service updates: normal vs minor updates
+## Ordering of service updates: normal vs minor updates
 
 Container image updates currently occur in parallel when updating
 custom images of the OpenStackVersion resource. On the ControlPlane
@@ -174,3 +174,100 @@ the update at a high level.
    rollbacks are not recommended/supported.
  * Major upgrades are not targeted at this time. However the OpenStackVersion
    CR may be useful as a means to help drive those as well.
+
+## Managing OpenStack Service Version Incompatibilities
+
+OpenStack services can exhibit incompatibilities between versions that require
+careful handling during updates to prevent services from entering a
+`CrashLoopBackOff` state. An example is `Glance`, which changed its default
+deployment model from `httpd+ProxyPass` to `httpd+WSGI` between feature releases.
+In brownfield environments, this creates a challenge: transitioning `Glance` from
+one deployment model to another without breaking the existing ControlPlane's
+ability to reach a `Ready` state.
+
+The solution addresses two critical aspects:
+
+1. **Backward Compatibility in Service Operators**: when breaking changes are
+   introduced, service operators must maintain the ability to orchestrate both
+   legacy and current deployment models simultaneously.
+
+2. **Informed Decision Making**: the openstack-operator must provide a
+   mechanism for building custom resources (CRs) with sufficient information to
+   enable services to make informed deployment decisions.
+
+### Implementation Pattern
+
+The solution that addresses this problem leverages an `annotation-based` pattern
+centered on the `OpenStackVersion` Kubernetes CR. This CR triggers updates and
+provides the necessary data for version transitions.
+A new `ServiceDefaults` field has been added to the `OpenStackVersion` Status:
+
+```golang
+// ServiceDefaults - struct that contains defaults for OSP services that can
+// change over time but are associated with a specific OpenStack release version
+type ServiceDefaults struct {
+	GlanceWsgi *string `json:"glanceWsgi,omitempty"`
+}
+```
+
+`ServiceDefaults` values vary across `discovered releases`.
+Each value in `.Status.AvailableVersion` can have its own associated defaults.
+Rather than relying on specific version numbers, this mechanism allows
+arbitrary values to be associated with particular OpenStack releases, providing
+flexibility in version management.
+During CR reconciliation, the service defaults are used to `annotate` the
+resulting service.
+Service operators then process these annotations to make deployment decisions.
+The service operator serves as the final component in this chain, interpreting
+annotations and implementing the appropriate deployment strategy based on their
+semantics.
+This approach ensures smooth transitions between incompatible service versions
+while maintaining system stability and operator control over deployment models.
+
+### Example
+
+The diagram below shows how `Glance` has two different annotation values defined
+in the `serviceDefaults` `OpenStackVersion` Status field.
+Based on the values, which is translated into a Glance top-level CR annotation,
+`glance-operator` orchstrates the deployment of the underlying `GlanceAPI`
+resources accordingly.
+
+```
++---------------------------------------+      +---------------------------------------------------+       +-------------------------------------------------+
+|      +----------------------+         |      |        +----------------------+                   |       |                                                 |
+|      |  openstack-version  | -------------------------| openstack-controller |                   |       |    +-------------------+                        |
+|      +----------------------+         |      |        +----------------------+                   |       |    |   glance-operator |                        |
+|        |                              |      |            |                                      |       |    +-------------------+                        |
+|        |                              |      |            | (annotate Glance CR)                 |       |      |                                          |
+|        |-> (FR2) [GlanceWSGI: false]-------------------------> [glance.openstack.org/wsgi: false]------->|      +-> if (glance.openstack.org/wsgi) == true |
+|        |                              |      |            |                                      |       |          then                                   |
+|        |                              |      |            |                                      |       |             deploy: httpd+wsgi                  |
+|        |                              |      |            |                                      |       |          else                                   |
+|        |                              |      |            | (annotate Glance CR)                 |       |             deploy: httpd+proxypass             |
+|        |-> (FR3) [GlanceWSGI: true]--------------------------> [glance.openstack.org/wsgi: true]-------->|                                                 |
+|                                       |      |            | (minor updates)                      |       |                                                 |
+|                                       |      |                                                   |       +-------------------------------------------------+
++---------------------------------------+      +---------------------------------------------------+
+```
+
+
+#### Flow Explanation
+
+1. **ServiceDefaults**: The `OpenstackVersion` object sets for different
+   OpenStack releases (FR2, FR3) the corresponding `GlanceWSGI` values in
+   `serviceDefaults`
+
+2. **Annotation Propagation**: The openstack-controller reads these defaults
+   and applies them as annotations to the Glance CR:
+
+   - **FR2**: `glance.openstack.org/wsgi: false`
+   - **FR3**: `glance.openstack.org/wsgi: true`
+
+3. **Deployment Decision**: The `glance-operator` reads the annotation and
+   selects the appropriate deployment model:
+
+   - **wsgi: true**: Deploy GlanceAPI with httpd+WSGI
+   - **wsgi: false**: Deploy GlanceAPI with httpd+ProxyPass
+
+This pattern enables seamless transitions between deployment models while
+maintaining backward compatibility during updates.
