@@ -61,8 +61,8 @@ you bump the dependency of a service operator (keystone-operator, or
 glance-operator, etc) in the openstack-operator project you are also bumping the
 dependency of the service operator controller-manager container artifact. This works
 because we tag all container images with the psuedoversion and thus can always find
-the correct container image. When 'make bindata' executes it syncronizes all the
-RELATED\_IMAGE variables to point to the correct container images accordinly using
+the correct container image. When 'make bindata' executes it synchronizes all the
+RELATED\_IMAGE variables to point to the correct container images accordingly using
 the appropriate [sha/digest](https://github.com/openstack-k8s-operators/openstack-operator/blob/main/config/operator/manager_operator_images.yaml)
 so that offline airgapped testing is also fully supported upstream.
 

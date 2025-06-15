@@ -52,7 +52,7 @@ This github action can also be used when working on your fork to build and push 
 
 **In your quay.io**
 
-* Recommended to create a robot account in quay.io under `Account Settings` -> `Robot Account` which then gets write access to the operator repositories. Using thing prevents from adding the main user account details in the github secrets. E.g. when name the robot account `ospk8s` the full user name will be `<username>+ospk8s`. The password can be seen in the `Options` -> `View Credentials` when the robot account got created.
+* Recommended to create a robot account in quay.io under `Account Settings` -> `Robot Account` which then gets write access to the operator repositories. Using this prevents from adding the main user account details in the github secrets. E.g. when name the robot account `ospk8s` the full user name will be `<username>+ospk8s`. The password can be seen in the `Options` -> `View Credentials` when the robot account got created.
 * For each operator create the three repositories `<service-name>-operator`, `<service-name>-operator-bundle` and `<service-name>-operator-index`
 * Ensure the robot account has write permissions to all three repositories
 
@@ -70,4 +70,4 @@ This github action can also be used when working on your fork to build and push 
 | `REDHATIO_USERNAME` | user name to use to login to the RH registry |
 | `REDHATIO_PASSWORD` | password for the RH registry account |
 
-When a branch gets now pushed to the forked repo, the github actions get triggered and all three images get build. The images get pushed with the commit ID as tag. Also a tag with `<branch name>-latest` points to the latest version. When deploying the operator for testing, it is recommended to use the commit ID tag as this is uniq and prevents issues when deploy multiple times tifferent versions.
+When a branch gets now pushed to the forked repo, the github actions get triggered and all three images get build. The images get pushed with the commit ID as tag. Also a tag with `<branch name>-latest` points to the latest version. When deploying the operator for testing, it is recommended to use the commit ID tag as this is unique and prevents issues when deploy multiple times using different versions.

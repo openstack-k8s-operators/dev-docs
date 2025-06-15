@@ -1,5 +1,5 @@
 # Start a new service operator
-To start a new service operator from scratch and allign to the work done in the keystone-operator do:
+To start a new service operator from scratch and align to the work done in the keystone-operator do:
 
 ## Start new project
 ```bash
@@ -286,7 +286,7 @@ This way other operators creating CRs of this operator only need to depend
 on a small subset of the operator implementation.
 
 ## Test the operator
-### Run the operator local without need to buld image
+### Run the operator local without need to build image
 A pre req is that the CRDs, RBAC resources got all created in the cluster.
 
 ```bash

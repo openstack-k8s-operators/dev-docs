@@ -65,7 +65,7 @@ default containerImage during automatic updates. This is a manual operation
 because there is no way to fully automate the selection of those images at this
 time. To configure a Cinder volume backend named 'pure' with a different image 
 during the updates, the administrator can add the name 'pure' to the
-'cinderVolumeImages' map withing the 'customContainerImages' section of
+'cinderVolumeImages' map within the 'customContainerImages' section of
 the OpenStackVersion CR and set a custom image to be used for that volume backend.
 Multiple named Cinder volume backends may be configured in this manner.
 

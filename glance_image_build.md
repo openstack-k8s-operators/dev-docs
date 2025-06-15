@@ -2,7 +2,7 @@
 
 This document provides an example of using TCIB to build
 a modified version of the openstack-glance-api container.
-It then provides an eample of how publish it to a personal
+It then provides an example of how to publish it to a personal
 quay.io account and deploy it for testing in OCP.
 
 ### Build an image with TCIB
@@ -35,7 +35,7 @@ following command to the end of the list of commands.
 ```
 curl -k -L https://raw.githubusercontent.com/openstack/glance/ee7e96f06af741bb34bedac18fa2c4616fcc3905/glance/location.py -o /usr/lib/python3.9/site-packages/glance/location.py
 ```
-When the following commmand is run:
+When the following command is run:
 ```
 sudo openstack tcib container image build \
    --config-file containers.yaml \

@@ -158,7 +158,7 @@ neutron-operator-tempest-multinode:
 
 With such changes to the zuul's job configuration in the operator's repository
 Pull Request to that repo can be opened with the `Depends-On` directive pointing
-to the upsteam gerrit change. This change will be then included in the
+to the upstream gerrit change. This change will be then included in the
 containers build for the CI job and used there.
 
 There is example [pull

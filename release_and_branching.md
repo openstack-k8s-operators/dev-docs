@@ -16,7 +16,7 @@ For each operator/repository upstream we build 3 artifact/containers:
 * bundle
 * catalog/index image (upstream only)
 
-The last artifact above (catalog/index images) are provided as a convience upstream as a means to install ad-hoc sets of
+The last artifact above (catalog/index images) are provided as a convenience upstream as a means to install ad-hoc sets of
 OpenStack services operators via projects like install_yamls. They are not used directly in the productized openstack-operator.
 The operator container and bundle are used in all deployment cases whether you install individual operators, or as a set via
 the meta openstack-operator.

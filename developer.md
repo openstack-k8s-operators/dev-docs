@@ -29,7 +29,7 @@ An individual, per reconcile function log object logr instantiation will create
 a controller unique, race safe and precise logr object.
 It can then be used with log.Info and log.Error with a string / err obj. (for
 log.Error)  and more name/value pairs as needed: `log.Info(msg string,
-keysAndValues`. The context of the controller, reconcile id , etc would be
+keysAndValues)`. The context of the controller, reconcile id, etc would be
 automatically included in logger output.
 
 ## Clients
@@ -62,7 +62,7 @@ database module uses the name of the `MariaDB` CR to formulate the label
 selector query to find the `Service` instance created by the `MariaDB` CR.
 
 ## Child objects
-When a controller creates a child object during reconcilation it needs to
+When a controller creates a child object during reconciliation it needs to
 decide what will be the lifecycle of the child. There are two categories:
 
 1. The child can be deleted at any time because the owner can re-create it
@@ -123,7 +123,7 @@ can be used in the `Reconciler.Status().Patch()` to do the minimal update the
 
 ### Always return after update
 For safety we should return from the reconciler after doing an update on the
-instance. If we don't the we can get read-after-write consistency errors in the
+instance. If we don't then we can get read-after-write consistency errors in the
 reconciler.
 
 The reason is that the reconciler is called with an object from a shared
@@ -148,7 +148,7 @@ There are two reasons to add a finalizer to a CR instance from its reconciler:
 
 2. If the instance needs specific cleanup actions. For example running a `Job`
 when the instance is being deleted. Note that deleting children CRs are
-automatic if `OwnerReferece` is set no explict delete is needed there.
+automatic if `OwnerReference` is set no explicit delete is needed there.
 
 ## Defaulting structs
 When a CRD has an optional struct field the defaulting of that field needs
@@ -182,12 +182,12 @@ type PasswordSelector struct {
 When `passwordSelectors` is not provided in the input then the default defined
 for the `PasswordSelectors` field will be used. But when the
 `passwordSelectors` field is in the input but only defines the `database` field
-but not the `service` then the default defiened at `Service` field will be
+but not the `service` then the default defined at `Service` field will be
 used.
 
 ## CRD fields with omitempty
 
-Some fields omited from serialization using the `omitempty` marker,
+Some fields omitted from serialization using the `omitempty` marker,
 thus sparing time that would have to be used for encoding them.
 By marking field with omitempty, it will not be encoded, if it contains
 value defined as empty. This value is type dependent, for example `0` for integers,
@@ -197,7 +197,7 @@ It is necessary for the operator code to expect this behavior,
 and special care must be taken when it comes to omitting pointers. 
 All pointer fields marked as `omitempty` must be checked if they are not nil before use.
 
-When used in conjuction with `Optional` kubebuilder validation, the field
+When used in conjunction with `Optional` kubebuilder validation, the field
 has to be assumed to be empty by default and treated as such.
 Pointers to booleans and integers can be especially tricky in cases like this.
 Checks for nil value must be implemented before the field is used.

@@ -195,7 +195,7 @@ nodes to avoid unnecessary Open vSwitch data plane disruption:
 
 - When updating Open vSwitch from one major version to another, the
   `openvswitch` service should be re-enabled after the package update. (We may
-  avoid distingushing between major and minor version updates and *always*
+  avoid distinguishing between major and minor version updates and *always*
   enable it after any Open vSwitch package update.) This can be achieved by
   installing a
   [`systemd` `preset` file](https://www.freedesktop.org/software/systemd/man/latest/systemd.preset.html)

@@ -9,7 +9,7 @@ in.
 
 Note that this topic does not cover unit tests in lib-common.
 
-## Prequisites
+## Prerequisites
 
 * You forked the [lib-common](https://github.com/openstack-k8s-operators/lib-common) repository, and have a local clone of your fork
 * You have an operator running locally that you intend to use to test your lib-common changes

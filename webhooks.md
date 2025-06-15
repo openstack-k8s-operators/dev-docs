@@ -8,7 +8,6 @@ General information about Kubernetes/OpenShift webhooks can be found here:
 * https://docs.openshift.com/container-platform/4.12//operators/understanding/olm/olm-webhooks.html
 
 ## Why did we introduce webhooks?
-
 The initial injection of webhooks into our operators was done to achieve greater flexibility with container image defaults -- that is, for default OpenStack service images, not for the operators themselves.  By using mutating/defaulting webhooks, we are able to remove hard-coded `kubebuilder` annotation defaults from our CRD Golang types and instead provide them via environment variables ([example](https://github.com/openstack-k8s-operators/cinder-operator/blob/main/config/default/manager_default_images.yaml)).  These environment variables are read by the operator controller-manager during its initialization ([example](https://github.com/openstack-k8s-operators/cinder-operator/blob/feac84f5479a33a708ed94d5deedf9366b328038/main.go#L163-L171)) and are then available to the controller-manager's mutating/defaulting webhooks during CR creation, where they can be applied if the user has not included an explicit image in the CR definition ([example](https://github.com/openstack-k8s-operators/cinder-operator/blob/feac84f5479a33a708ed94d5deedf9366b328038/api/v1beta1/cinder_webhook.go#L66-L94)).
 
 Why do we need this environment-variable-based flexibility?
@@ -381,11 +380,12 @@ GOWORK= OPERATOR_TEMPLATES=./templates make run-with-webhook
 
 This `make` command will:
 
-1. Create self-signed certs for the webhooks and create `ValidatingWebhookConfiguration` and `MutatingWebhookConfiguration` resources within the cluster that use the certs.  The operator itself also knows where the find the certs in a default location on your local host (`/tmp/k8s-webhook-server/serving-certs`) and will use them when it starts running.
+1. Create self-signed certs for the webhooks and create `ValidatingWebhookConfiguration` and `MutatingWebhookConfiguration` resources within the cluster that use the certs.  The operator itself also knows where to find the certs in a default location on your local host (`/tmp/k8s-webhook-server/serving-certs`) and will use them when it starts running.
 2. Find the OpenShift SDN gateway IP for your CRC cluster.  If you are not using CRC, you will need to provide `CRC_IP=<OpenShift SDN gateway IP>` to the aforementioned `make` command!
 3. Inject the `CRC_IP` into the `ValidatingWebhookConfiguration` and `MutatingWebhookConfiguration` resources so that they point the webhook server running in your local operator controller-manager process.
 4. Open the local host's firewall to allow port 9443 traffic (the port used by the webhooks).  This is done in the `libvirt` `firewall-zone`.  _If your local cluster is running in a different zone, you will have to manually add a firewall rule for port 9443 TCP traffic yourself!_
 5. Finally, run the actual operator controller-manager and the webhook server.
 
 You should now be able to create CRs for the associated operator and have the webhook logic execute as expected.
+
 **NOTE:** If you want to switch back to using the OLM-deployed version of your operator, you will need to manually `oc delete` the `ValidatingWebhookConfiguration` and `MutatingWebhookConfiguration` resources created by this `make` command!
