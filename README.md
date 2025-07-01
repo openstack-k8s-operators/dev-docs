@@ -26,6 +26,7 @@ Developer Documentation related to podified controlplane.
 * [Service config and bootstrap](service_config.md)
 * [Overview of Writing EDPM services](edpm_service_overview.md)
 * [Overview of Updating Services on EDPM Nodes](edpm_update_overview.md)
+* [Tech Preview: New procedure of updating EDPM nodes](new_edpm_update_overview.md)
 * [The journey of a config variable in openstack-k8s-operators](journey_of_a_config_variable.md)
 * [Troubleshooting](troubleshooting.md)
 * [FIPS](fips.md)
