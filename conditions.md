@@ -39,7 +39,7 @@ This does not reflect a complete list of condition types, it is just to illustra
 
 | Condition Type | Description |
 | --- | --- |
-| `ReadyCondition` | All APIs have at least one `ReadyCondition` condition type that summarizes the overall operational state of the API object. Each CRD has a `IsReady()` method which returns a bool of the status of the instance/Ready condition https://github.com/openstack-k8s-operators/keystone-operator/blob/82267e337f6a24ac86987be0c13275b22a838d6b/api/v1beta1/keystoneapi\_types.go#L221 |
+| `ReadyCondition` | All APIs have at least one `ReadyCondition` condition type that summarizes the overall operational state of the API object. Each CRD has a `IsReady()` method which returns a bool of the status of the instance/Ready condition. [keystone example](https://github.com/openstack-k8s-operators/keystone-operator/blob/82267e337f6a24ac86987be0c13275b22a838d6b/api/v1beta1/keystoneapi_types.go#L221) |
 | `InputReadyCondition` | Condition which indicates if all required input sources are available, like e.g. secret holding passwords, other config maps providing input for the service. |
 | `ServiceConfigReadyCondition` | Condition which indicates that all service config got rendered ok from the templates and stored in the ConfigMap |
 | `DBReadyCondition` | This condition is mirrored from the `Ready` condition in the `mariadbdatabase` ref object to the service API. |
