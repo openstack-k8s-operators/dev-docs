@@ -4,7 +4,7 @@ This is a collection of guidelines for developing the operators. The goal
 here is to keep the codebase consistent and help spread good patterns
 between the developers.
 
-You can also consult with the [OpenShift Operator Best Practices](https://redhat-openshift-ecosystem.github.io/community-operators-prod/best-practices/).
+You can also consult with the [OpenShift Operator Best Practices](https://redhat-openshift-ecosystem.github.io/operator-pipelines/users/best-practices/).
 
 ## Logging
 When you log from any of the controller implementations ,

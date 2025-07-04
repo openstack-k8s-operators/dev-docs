@@ -309,7 +309,7 @@ add a prow job to run that make target for every PR. See for the
 
 Tips and tricks for improving the efficiency and organization of your Ginkgo tests:
 
-1. To avoid duplicating general test setup code, utilize Ginkgo's global `BeforeEach` and `AfterEach` functions. These should be placed in the [top-level suite](https://github.com/openstack-k8s-operators/nova-operator/blob/main/test/functional/suite_test.go#L237) to ensure consistent setup and teardown across all tests. This BeforeEach can be combined with [`BeforeEach`](https://github.com/openstack-k8s-operators/nova-operator/blob/main/test/functional/nova_multicell_test.go#L100) in any test lvl. More `BeforeEach` and `Context` [here](https://onsi.github.io/ginkgo/#shared-behaviors).
+1. To avoid duplicating general test setup code, utilize Ginkgo's global `BeforeEach` and `AfterEach` functions. These should be placed in the [top-level suite](https://github.com/openstack-k8s-operators/nova-operator/blob/1c5567b12b750772e37ec378e067133f19629ba5/test/functional/suite_test.go#L260) to ensure consistent setup and teardown across all tests. This BeforeEach can be combined with [`BeforeEach`](https://github.com/openstack-k8s-operators/nova-operator/blob/1c5567b12b750772e37ec378e067133f19629ba5/test/functional/nova_multicell_test.go#L60) in any test lvl. More `BeforeEach` and `Context` [here](https://onsi.github.io/ginkgo/#shared-behaviors).
 
 2. When using envtest, create a unique namespace for each test run. This is necessary because namespaces cannot be deleted in a locally running envtest. For more information, refer to the [Kubebuilder documentation](https://book.kubebuilder.io/reference/envtest.html#namespace-usage-limitation) on namespace usage limitation.
 
