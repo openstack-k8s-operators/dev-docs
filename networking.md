@@ -14,7 +14,7 @@ The OCP route hostname gets registered as the keystone public endpoint for the s
 +--------------+-----------+------------------------------------------------------------------+
 | Service Name | Interface | URL                                                              |
 +--------------+-----------+------------------------------------------------------------------+
-| <service     | public    | http://<service>-public-openstack.apps.ostest.test.metalkube.org |
+| <service>    | public    | http://<service>-public-openstack.apps.ostest.test.metalkube.org |
 +--------------+-----------+------------------------------------------------------------------+
 ```
 
@@ -51,7 +51,7 @@ annotations:
 ```
 
 ## Env Pre-requisite
-The NMstate and MetalLB operator need to be deployed and the OCP environment must support Multis CNI
+The NMstate and MetalLB operator need to be deployed and the OCP environment must support Multus CNI
 
 ### NMstate operator
 The NMstate operator is performing state-driven network configuration across the cluster nodes with NMState. Further details can be found at:
@@ -294,8 +294,9 @@ Per default a `ClusterIP` k8s service gets created for the public API endpoint. 
  ```
 
 #### RabbitMQ
-RabbitMQ instances can be exposed to an isolated network in the same way. The RabbitMQ CRD supports service overrides which can be used to create a `LoadBalancer` type k8s service which allows connection to the service from an isolated network
-**Note** multiple RabbitMQ instances can not share the same VIP as they use the same port. If multiple RabbitMQ instances need to be exposed to the same network distinct ip address have to be used.
+RabbitMQ instances can be exposed to an isolated network in the same way. The RabbitMQ CRD supports service overrides which can be used to create a `LoadBalancer` type k8s service which allows connection to the service from an isolated network.
+
+**Note:** multiple RabbitMQ instances can not share the same VIP as they use the same port. If multiple RabbitMQ instances need to be exposed to the same network distinct ip address have to be used.
 
 Example exposing two RabbitMQ instances to the internal api network:
 ```yaml
@@ -325,7 +326,7 @@ Example exposing two RabbitMQ instances to the internal api network:
 
 The Glance spec can be used to configure Glance to register e.g. the internal endpoint to an isolated network.
 
-The following represents an example of `Glance` resource that can be used to trigger the service deployment, and have the internal `GlanceAPI` endpoint registerd as a MetalLB service using the IPAddressPool `internalapi`, request to use the IP `172.17.0.80` as the VIP and the IP is shared (default) with other services.
+The following represents an example of `Glance` resource that can be used to trigger the service deployment, and have the internal `GlanceAPI` endpoint registered as a MetalLB service using the IPAddressPool `internalapi`, request to use the IP `172.17.0.80` as the VIP and the IP is shared (default) with other services.
 
 ```
 apiVersion: glance.openstack.org/v1beta1
@@ -422,11 +423,11 @@ Examples on how to use the `OpenStackControlPlane` CRD can be found at
 * https://github.com/openstack-k8s-operators/openstack-operator/blob/main/config/samples/core_v1beta1_openstackcontrolplane_network_isolation_ceph.yaml
 
 ## DNS
-The the infra-operator privides CRDs to setup and manage a dnsmasq instances for DNS.
+The the infra-operator provides CRDs to setup and manage a dnsmasq instances for DNS.
 
 The `DNSMasq` CRD allows creating a dnsmasq DNS server instance and expose the service via `ExternalEndpoints` as with the API endpoints via MetalLB to systems on isolated networks.
 
-Using `Spec.Options` the instance can be customized from the default config started. E.g. adding a DNS server to forward requests to which are not resolvable vie the local instances can be done like:
+Using `Spec.Options` the instance can be customized from the default config started. E.g. adding a DNS server to forward requests to which are not resolvable via the local instances can be done like:
 
 ```yaml
 spec:
@@ -458,7 +459,7 @@ spec:
     - edpm-compute-0.internalapi
     ip: 172.17.0.100
   - hostnames:
-    - edpm-compute-0.storge
+    - edpm-compute-0.storage
     ip: 172.18.0.100
   - hostnames:
     - edpm-compute-0.tenant
@@ -470,7 +471,7 @@ spec:
     - edpm-compute-1.internalapi
     ip: 172.17.0.101
   - hostnames:
-    - edpm-compute-1.storge
+    - edpm-compute-1.storage
     ip: 172.18.0.101
   - hostnames:
     - edpm-compute-1.tenant
@@ -480,7 +481,7 @@ spec:
 Additionally there is a CRD-less `service_controller`. It watches for `LoadBalancer` services in the same namespace of a `DNSMasq` instance and creates a `DNSData` CR to auto register service endpoints which have an annotation set with  `"dnsmasq.network.openstack.org/hostname": <hostname>`. This annotation gets auto added to the `LoadBalancer` services exposed using lib-common `https://github.com/openstack-k8s-operators/lib-common/pull/258`.
 
 ## IPAM
-The the infra-operator privides CRDs for IPAM.
+The the infra-operator provides CRDs for IPAM.
 
 The `NetConfig` CRD allows to describe the overall networks used for the environment.
 
@@ -655,4 +656,4 @@ status:
     vlan: 50
 ```
 
-The reservation is also storted via the `Reservation` CRD, but it is intended for "internal" use only.
+The reservation is also stored via the `Reservation` CRD, but it is intended for "internal" use only.

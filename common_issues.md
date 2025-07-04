@@ -21,7 +21,7 @@ Common issues
   ```
   replace github.com/openstack-k8s-operators/lib-common/modules/common v0.0.0-00010101000000-000000000000 => github.com/openstack-k8s-operators/lib-common/modules/common v0.0.0-20220909175216-e774739df18a
   ```
-  After adding the above, `make` should suceed in the go
+  After adding the above, `make` should succeed in the go
   workspace. Remove this line prior to submitting a PR as we do not
   want to hard code an old version which will not be automatically
   updated.

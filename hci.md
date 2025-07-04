@@ -190,14 +190,14 @@ edpm_ceph_hci_pre_enabled_services:
 ```
 If other Ceph services, like the Ceph Dashboard, will be deployed
 on HCI nodes, then add additional services to the enabled services
-list above. For more informatoin, see the `ceph-hci-pre` role in the
+list above. For more information, see the `ceph-hci-pre` role in the
 [edpm-ansible role documentation](https://openstack-k8s-operators.github.io/edpm-ansible/roles.html).
 
 As seen in the example
 [dataplane_v1beta1_openstackdataplanedeployment_pre_ceph_hci.yaml](https://github.com/openstack-k8s-operators/openstack-operator/tree/main/config/samples/dataplane/pre_ceph_hci),
 the `configure-os` and `run-os` services are run after `ceph-hci-pre`
 because they enable the firewall rules which `ceph-hci-pre` put in
-place. The `run-os` service also configures NTP, which is requried by
+place. The `run-os` service also configures NTP, which is required by
 Ceph.
 
 ### Confirm the Network is configured
@@ -327,7 +327,7 @@ completed by doing the following.
 
 Use `cephadm shell` to start a Ceph shell and confirm the tuning
 values were applied. For example, to check that the NUMA and memory
-target auto tuning run commands lke this:
+target auto tuning run commands like this:
 ```shell
   [ceph: root@edpm-compute-0 /]# ceph config dump | grep numa
     osd                                             advanced  osd_numa_auto_affinity                 true
@@ -440,7 +440,7 @@ OpenStackDataPlaneService. This custom service uses a ConfigMap called
 `ceph-nova` which ensures that the file `03-ceph-nova.conf` is is used
 by Nova.
 
-Create an additonal ConfigMap to set the `reserved_host_memory_mb`
+Create an additional ConfigMap to set the `reserved_host_memory_mb`
 to a value appropriate for your system.
 
 ```yaml

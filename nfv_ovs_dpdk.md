@@ -48,7 +48,7 @@ Only the services which are on the list will be configured.
 
 ## Configure the EDPM ansible variables of the EDPM nodes
 
-EDPM ansible variabes based on following EDPM ansible roles,
+EDPM ansible variables based on following EDPM ansible roles,
 ```
 [edpm_ovs_dpdk](https://github.com/openstack-k8s-operators/edpm-ansible/blob/main/roles/edpm_ovs_dpdk/meta/argument_specs.yml)
 [edpm_kernel](https://github.com/openstack-k8s-operators/edpm-ansible/blob/main/roles/edpm_kernel/meta/argument_specs.yml)

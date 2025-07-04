@@ -109,7 +109,7 @@ Replace the image path with your actual internal registry route if different.
 By default, the OpenShift internal image registry (`openshift-image-registry`) is
 not externally accessible. However, exposing it can be useful when non-cluster
 components—such as `EDPM` nodes need to pull patched container images directly
-(e.g., hotfixes built with OpenShift `BuildConfig` described in the previos
+(e.g., hotfixes built with OpenShift `BuildConfig` described in the previous
 section).
 
 This section explains how to expose the internal registry using a secure

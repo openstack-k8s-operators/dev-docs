@@ -104,7 +104,7 @@ Running a tool like `kubefwd` locally allows the local running operator to commu
 For more insights on the tool check [Kubernetes Port Forwarding for Local Development](https://imti.co/kubernetes-port-forwarding/)
 and the tool at https://github.com/txn2/kubefwd. Pre-compiled binaries can be found at https://github.com/txn2/kubefwd/releases .
 
-To run `kubefwd` to allow access to all k8s servies in the `openstack` namespace:
+To run `kubefwd` to allow access to all k8s services in the `openstack` namespace:
 
 ```
 $ export KUBECONFIG=~/.kube/config

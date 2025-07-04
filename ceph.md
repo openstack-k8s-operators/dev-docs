@@ -121,9 +121,9 @@ type: Opaque
 The example above can be used to pass two configuration files and two
 keyring files for the clusters known as "ceph" and "ceph2". When the
 command `virsh secret-get-value $FSID` is passed the unique FSID
-in `ceph.conf`, it will retrun the cephx secret key from
+in `ceph.conf`, it will return the cephx secret key from
 `ceph.client.openstack.keyring`. If the same command is passed the
-unique FSID in `ceph2.conf`, it will retrun the cephx secret key from
+unique FSID in `ceph2.conf`, it will return the cephx secret key from
 `ceph2.client.openstack.keyring`. The FSID must map one-to-one with
 the cephx secret. Thus, it is not supported to add an extra cephx
 key called `ceph2.client.other.keyring` to the example above.
@@ -184,7 +184,7 @@ running on OpenShift mounts the files in the Ceph secret
 and copies them to the EDPM host using the
 [edpm_ceph_client_files](https://github.com/openstack-k8s-operators/edpm-ansible/tree/main/roles/edpm_ceph_client_files)
 Ansible role. The Nova containers then have a copy of `/etc/ceph`
-that they can use to acccess the cephx key and Ceph configuration
+that they can use to access the cephx key and Ceph configuration
 file.
 
 Though containers hosted on EDPM nodes use the path `/etc/ceph`
