@@ -388,4 +388,9 @@ This `make` command will:
 
 You should now be able to create CRs for the associated operator and have the webhook logic execute as expected.
 
-**NOTE:** If you want to switch back to using the OLM-deployed version of your operator, you will need to manually `oc delete` the `ValidatingWebhookConfiguration` and `MutatingWebhookConfiguration` resources created by this `make` command!
+**NOTE:** If you want to switch back to using the OLM-deployed version of your operator, run_with_local_webhook.sh script handles SIGINT and SIGTERM signal and tries to execute `oc delete` the `ValidatingWebhookConfiguration` and `MutatingWebhookConfiguration` resources created by this `make` command! If somehow it is not deleted, you will need to manually `oc delete` the `ValidatingWebhookConfiguration` and `MutatingWebhookConfiguration` resources created by this `make` command!
+Also you need to scale up replicas of your controller-manager using below command, which was scale-down by this `make run-with-webhook` command.
+```bash
+oc patch csv -n openstack-operators <OpenStack operator CSV> --type json \
+  -p="[{"op": "replace", "path": "/spec/install/spec/deployments/0/spec/replicas", "value": "1"}]"
+```
