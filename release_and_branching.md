@@ -4,7 +4,7 @@
 
 We release set of operators as a single product called the 'OpenStack Operator'. The openstack-operator itself
 acts as a meta operator. It contains CRDs which can be used to create an OpenStackControlplane in a single action.
-Additionally, installation of of a specific version of the openstack-operator drives the installation of all
+Additionally, installation of a specific version of the openstack-operator drives the installation of all
 openstack service operators via OLM (Operator Lifecycle Manager) dependencies. This document aims to summarize the
 relationship between how these components are released and branched upstream.
 
@@ -58,7 +58,7 @@ In this case: quay.io/openstack-k8s-operators/cinder-operator-bundle:3c5c40e6cc3
 
 ## Tagging submodules for api/apis (nested modules)
 
-Each service operator has either an 'api' or an 'apis' directory that contains the API structs, webhooks, and some common helpers for that operator. These directories have a separate nested go.mod file in order to minimimize the dependencies involved in using
+Each service operator has either an 'api' or an 'apis' directory that contains the API structs, webhooks, and some common helpers for that operator. These directories have a separate nested go.mod file in order to minimize the dependencies involved in using
 the CRD structs in external operators.
 
 NOTE: there are tentative plans to combine things into a common 'api' project at a later date.
@@ -79,9 +79,9 @@ You could end up with this in your go.mod file(s):
     github.com/openstack-k8s-operators/cinder-operator/api v0.2.0
 ```
 
-If this happens it is recommended that you make one extra commit to the api dir to flip it back to a psuedoversion.
+If this happens it is recommended that you make one extra commit to the api dir to flip it back to a pseudoversion.
 
-NOTE: This is a behavior of 'go mod' that would be nice to force to use psuedoversions. TODO(look into how we might force this)
+NOTE: This is a behavior of 'go mod' that would be nice to force to use pseudoversions. TODO(look into how we might force this)
 
 Our convention is currently to tag/bump service operator API submodules on 'main' only when an upstream release branch gets created.
 
@@ -97,7 +97,7 @@ For the main branch you can always install the latest openstack-operator by usin
 apiVersion: operators.coreos.com/v1alpha1
 kind: CatalogSource
 metadata:
-  name: opentack-operator-index
+  name: openstack-operator-index
   namespace: openstack-operators
 spec:
   image: quay.io/openstack-k8s-operators/openstack-operator-index:latest
@@ -110,7 +110,7 @@ For a release branch you can always install the latest openstack-operator by usi
 apiVersion: operators.coreos.com/v1alpha1
 kind: CatalogSource
 metadata:
-  name: opentack-operator-index
+  name: openstack-operator-index
   namespace: openstack-operators
 spec:
   image: quay.io/openstack-k8s-operators/openstack-operator-index:dev-preview2-latest

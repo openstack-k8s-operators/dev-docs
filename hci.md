@@ -437,7 +437,7 @@ The `nova-custom-ceph` can be seen in the
 [example](https://github.com/openstack-k8s-operators/openstack-operator/blob/main/config/samples/dataplane_v1beta1_openstackdataplanedeployment_post_ceph_hci.yaml)
 and takes the place of the default `nova`
 OpenStackDataPlaneService. This custom service uses a ConfigMap called
-`ceph-nova` which ensures that the file `03-ceph-nova.conf` is is used
+`ceph-nova` which ensures that the file `03-ceph-nova.conf` is used
 by Nova.
 
 Create an additional ConfigMap to set the `reserved_host_memory_mb`

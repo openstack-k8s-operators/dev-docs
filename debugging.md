@@ -62,7 +62,7 @@ debug configuration. Create the `.vscode/tasks.json` with `Terminal`
 **Create `launch.json` for the debugger**
 A `.vscode/launch.json` needs to be created which instructs vscode how to start
 the debugger. Create the `.vscode/launch.json` with `Run` ->
-`Add configurarion` -> `Go: Launch Package`.
+`Add configuration` -> `Go: Launch Package`.
 
 ```json
 {

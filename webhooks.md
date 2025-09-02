@@ -5,7 +5,7 @@ Webhooks allow validation and/or defaulting/mutating logic to be added to the Ku
 General information about Kubernetes/OpenShift webhooks can be found here:
 
 * https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/
-* https://docs.openshift.com/container-platform/4.12//operators/understanding/olm/olm-webhooks.html
+* https://docs.openshift.com/container-platform/4.12/operators/understanding/olm/olm-webhooks.html
 
 ## Why did we introduce webhooks?
 The initial injection of webhooks into our operators was done to achieve greater flexibility with container image defaults -- that is, for default OpenStack service images, not for the operators themselves.  By using mutating/defaulting webhooks, we are able to remove hard-coded `kubebuilder` annotation defaults from our CRD Golang types and instead provide them via environment variables ([example](https://github.com/openstack-k8s-operators/cinder-operator/blob/main/config/default/manager_default_images.yaml)).  These environment variables are read by the operator controller-manager during its initialization ([example](https://github.com/openstack-k8s-operators/cinder-operator/blob/feac84f5479a33a708ed94d5deedf9366b328038/main.go#L163-L171)) and are then available to the controller-manager's mutating/defaulting webhooks during CR creation, where they can be applied if the user has not included an explicit image in the CR definition ([example](https://github.com/openstack-k8s-operators/cinder-operator/blob/feac84f5479a33a708ed94d5deedf9366b328038/api/v1beta1/cinder_webhook.go#L66-L94)).
@@ -46,7 +46,7 @@ It is furthermore recommended to add support for running the operator locally wi
 
 Both the defaulting and the validation logic of the webhook are implemented in
 the service operators but to apply them meaningfully we need to call them
-from the openstack-operator as the webhhooks will run there in a real
+from the openstack-operator as the webhooks will run there in a real
 deployment to default values on the top level (i.e. OpenStackControlPlane) CRD,
 to provide valuable feedback to the end user while blocking invalid Spec
 values.

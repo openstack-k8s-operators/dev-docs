@@ -423,7 +423,7 @@ Examples on how to use the `OpenStackControlPlane` CRD can be found at
 * https://github.com/openstack-k8s-operators/openstack-operator/blob/main/config/samples/core_v1beta1_openstackcontrolplane_network_isolation_ceph.yaml
 
 ## DNS
-The the infra-operator provides CRDs to setup and manage a dnsmasq instances for DNS.
+The infra-operator provides CRDs to setup and manage a dnsmasq instances for DNS.
 
 The `DNSMasq` CRD allows creating a dnsmasq DNS server instance and expose the service via `ExternalEndpoints` as with the API endpoints via MetalLB to systems on isolated networks.
 
@@ -481,7 +481,7 @@ spec:
 Additionally there is a CRD-less `service_controller`. It watches for `LoadBalancer` services in the same namespace of a `DNSMasq` instance and creates a `DNSData` CR to auto register service endpoints which have an annotation set with  `"dnsmasq.network.openstack.org/hostname": <hostname>`. This annotation gets auto added to the `LoadBalancer` services exposed using lib-common `https://github.com/openstack-k8s-operators/lib-common/pull/258`.
 
 ## IPAM
-The the infra-operator provides CRDs for IPAM.
+The infra-operator provides CRDs for IPAM.
 
 The `NetConfig` CRD allows to describe the overall networks used for the environment.
 

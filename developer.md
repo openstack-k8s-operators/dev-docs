@@ -7,7 +7,7 @@ between the developers.
 You can also consult with the [OpenShift Operator Best Practices](https://redhat-openshift-ecosystem.github.io/operator-pipelines/users/best-practices/).
 
 ## Logging
-When you log from any of the controller implementations ,
+When you log from any of the controller implementations,
 make use of "sigs.k8s.io/controller-runtime/pkg/log","github.com/go-logr/logr".
 Create a per operator/controller top level GetLogger func:
 ```golang
