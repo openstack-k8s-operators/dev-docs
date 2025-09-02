@@ -246,7 +246,7 @@ oc kustomize --load-restrictor LoadRestrictionsNone config/samples/dataplane/sri
 
 Custom `OpenStackDataPlaneService` called `nova-custom-sriov`
 has been created as described in
-the [documentation to configure OpenStack to use SRIOV](sriov.md).
+the [documentation to configure OpenStack to use SRIOV](nfv_sriov.md).
 The `nova-custom-sriov` can be seen in the
 [example](https://github.com/openstack-k8s-operators/openstack-operator/tree/main/config/samples/dataplane/sriov)
 and takes the place of the default `nova`

@@ -47,7 +47,7 @@ oc patch csv -n openstack-operators <your operator CSV> --type json \
   -p="[{"op": "remove", "path": "/spec/install/spec/deployments/0"}]"
 ```
 
-3. Then [remove the webhooks](https://github.com/openstack-k8s-operators/docs/blob/main/webhooks.md#disabling-webhooks)
+3. Then [remove the webhooks](https://github.com/openstack-k8s-operators/dev-docs/blob/main/webhooks.md#disabling-webhooks)
 
 4. (Optional) To restore the original OLM-based operator after you are done with local dev/testing:
 
