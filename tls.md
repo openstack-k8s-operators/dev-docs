@@ -309,7 +309,7 @@ The tests for general TLS functions are implemented in the [openstack-operator](
 * **Customize cert and CA cert duration parameters**
   * New durations are set to `500h0m0s` for the service certificates and `1000h0m0s` for the CA certificates.
 
-**Note**: To triggert certificate recreation, secrets should not be deleted, this method was used for testing purposes only. Learn more about triggering renewal in the [cert-manager ctml documentation](https://cert-manager.io/docs/reference/cmctl/#renew).
+**Note**: To trigger certificate recreation, secrets should not be deleted, this method was used for testing purposes only. Learn more about triggering renewal in the [cert-manager ctml documentation](https://cert-manager.io/docs/reference/cmctl/#renew).
 
 ### In Service Operators
 Each service operator implements its own kuttl tests, which can vary based on the specific operator and the [type of TLS service](#tls-common-package) each uses. Generally, the TLS kuttl tests cover the successful creation of volumes and volume mounts that hold the `combined-ca-bundle`, public, and internal certificates, ensuring the correct setup if the HTTPS scheme is used, etc. To facilitate kuttl testing, hardcoded certificate secrets are used, meaning kuttl does not require cert-manager at test runtime.

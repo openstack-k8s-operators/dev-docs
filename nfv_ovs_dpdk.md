@@ -221,7 +221,7 @@ should be added before the `libvirt` and `nova` (or `nova-custom-ovs-dpdk`
 in this case) services. It configures EDPM nodes with ovs dpdk.
 
 When the `nova-custom-ovs-dpdk` service Ansible job runs, it will copy
-overrides from the `ConfigMap`s onto the Nova hosts.
+overrides from the `ConfigMap` onto the Nova hosts.
 
 ### Create the OpenStackDataPlaneNodeSet
 

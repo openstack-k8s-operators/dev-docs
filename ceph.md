@@ -222,7 +222,7 @@ spec:
 
 Whenever Glance is configured to use Ceph as a backend the Glance
 operator will configure image conversion so that if an image is
-uploaed on qcow2 format, then it will automatically be converted
+uploaded on qcow2 format, then it will automatically be converted
 into raw format before it is stored in Ceph. This allows Ceph to
 create volumes and VMs from the image efficiently using COW
 references. For more information see the
