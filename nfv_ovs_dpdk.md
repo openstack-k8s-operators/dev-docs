@@ -253,7 +253,7 @@ oc kustomize --load-restrictor LoadRestrictionsNone openstack-operator/config/sa
 
 Custom `OpenStackDataPlaneService` called `nova-custom-ovs-dpdk`
 has been created as described in
-the [documentation to configure OpenStack to use OVS DPDK](ovs_dpdk.md).
+the [documentation to configure OpenStack to use OVS DPDK](nfv_ovs_dpdk.md).
 The `nova-custom-ovs-dpdk` can be seen in the
 [example](https://github.com/openstack-k8s-operators/openstack-operator/tree/main/config/samples/dataplane/ovs_dpdk)
 and takes the place of the default `nova`

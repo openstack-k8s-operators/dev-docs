@@ -274,7 +274,7 @@ When the associated operator is deployed via OLM, its webhooks are installed in 
 
 ### Changing webhook defaults in OLM context
 
-To change the webhook environment variable defaults (those mentioned [here](https://github.com/openstack-k8s-operators/docs/blob/main/webhooks.md#why-did-we-introduce-webhooks)) for an operator that was deployed via OLM, do the following _after_ you have installed the operator and its CSV reaches the `Succeeded` state:
+To change the webhook environment variable defaults (those mentioned [here](https://github.com/openstack-k8s-operators/dev-docs/blob/main/webhooks.md#why-did-we-introduce-webhooks)) for an operator that was deployed via OLM, do the following _after_ you have installed the operator and its CSV reaches the `Succeeded` state:
 
 1. Create a patch file to change the desired default
 
