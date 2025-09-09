@@ -54,7 +54,47 @@ This does not reflect a complete list of condition types, it is just to illustra
 | `Error` | condition with `Status=False` is an error |
 | `Warning` | condition with `Status=False` is a warning |
 | `Info` | condition with `Status=False` is informative |
-| “” (none) | should apply only to conditions with `Status=True` |
+| "" (none) | should apply only to conditions with `Status=True` |
+
+#### Condition Severity Guidelines
+
+This section follows consistent severity guidelines for operator conditions to ensure proper hierarchy and consistency across all OpenStack operators. The severity levels are used to classify the impact of `False` conditions on reconciliation progress.
+
+#### Severity Hierarchy
+
+**1. `SeverityError` - Critical Issues**
+- **Use for:** Conditions that completely block reconciliation progress and require manual intervention
+- **Examples:** Database connection failures, critical configuration errors, network attachment definition errors
+- **Reason:** `condition.ErrorReason`
+- **Impact:** Operator cannot proceed without manual intervention
+
+**2. `SeverityWarning` - Recoverable Issues**
+- **Use for:** Conditions that indicate problems but may resolve in next reconciliation
+- **Examples:** Missing dependencies being created, temporary resource unavailability, configuration issues that can be auto-corrected
+- **Reason:** `condition.ErrorReason`
+- **Impact:** Operator can retry and may succeed in subsequent reconciliations
+
+**3. `SeverityInfo` - Informational Status**
+- **Use for:** Conditions that don't block progress but provide status updates
+- **Examples:** Jobs running, waiting for dependencies, normal operational states not yet complete
+- **Reason:** `condition.RequestedReason`
+- **Impact:** No blocking, just informational status
+
+**4. `SeverityNone` - Success/Unknown States**
+- **Use for:** `Status=True` or `Status=Unknown` conditions (as per CRD documentation)
+- **Examples:** All `MarkTrue()` calls, `UnknownCondition()` calls
+- **Impact:** No issues, normal operation
+
+#### Consistency Rules
+
+- `RequestedReason` conditions should use `SeverityInfo` (waiting/processing states)
+- `ErrorReason` conditions should use `SeverityWarning` (recoverable) or `SeverityError` (critical)
+- Never use `SeverityWarning` with `RequestedReason`
+- Never use `SeverityInfo` with `ErrorReason`
+- "Not found" errors for dependencies should use `SeverityInfo` (if waiting for automatic creation) or `SeverityWarning` (if waiting for manual user creation)
+- Actual errors (not just currently-missing automatically-generated resources) should use `SeverityWarning` or `SeverityError`
+
+This ensures consistent behavior across all OpenStack operators and proper classification of condition severity for monitoring and alerting systems.
 
 ### Generic Reasons
 
