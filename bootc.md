@@ -39,6 +39,7 @@ export BUILDER_IMAGE="quay.io/centos-bootc/bootc-image-builder:latest"
 export EDPM_CONTAINERFILE="Containerfile"
 export RHSM_SCRIPT="empty.sh"  # Use "rhsm.sh" for RHEL with subscription
 export FIPS="1"  # Set to "0" to disable FIPS mode
+export USER_PACKAGES=""  # Space-separated list of additional packages to install
 ```
 
 ## Step 1: Clone the Repository
@@ -112,6 +113,7 @@ sudo buildah bud \
     --build-arg EDPM_BASE_IMAGE=${EDPM_BASE_IMAGE} \
     --build-arg RHSM_SCRIPT=${RHSM_SCRIPT} \
     --build-arg FIPS=${FIPS} \
+    --build-arg USER_PACKAGES="${USER_PACKAGES}" \
     --volume /etc/pki/ca-trust:/etc/pki/ca-trust:ro,Z \
     --volume $(pwd)/output/yum.repos.d:/etc/yum.repos.d:rw,Z \
     -f ${EDPM_CONTAINERFILE} \
@@ -254,6 +256,52 @@ modifying the build args. Key package categories include:
 - `PODMAN_PACKAGES`: Container runtime packages
 - `LIBVIRT_PACKAGES`: Virtualization packages
 - `CEPH_PACKAGES`: Ceph storage packages
+- `USER_PACKAGES`: User-customizable packages for additional functionality
+
+#### Adding Custom Packages with USER_PACKAGES
+
+The `USER_PACKAGES` build argument allows you to inject additional packages into the bootc image during build time. This is useful for adding site-specific tools, drivers, or utilities that are not included in the default package sets.
+
+**Usage:**
+
+```bash
+# Add custom packages during build
+export USER_PACKAGES="vim htop strace tcpdump"
+
+sudo buildah bud \
+    --build-arg EDPM_BASE_IMAGE=${EDPM_BASE_IMAGE} \
+    --build-arg RHSM_SCRIPT=${RHSM_SCRIPT} \
+    --build-arg FIPS=${FIPS} \
+    --build-arg USER_PACKAGES="${USER_PACKAGES}" \
+    --volume /etc/pki/ca-trust:/etc/pki/ca-trust:ro,Z \
+    --volume $(pwd)/output/yum.repos.d:/etc/yum.repos.d:rw,Z \
+    -f ${EDPM_CONTAINERFILE} \
+    -t ${EDPM_BOOTC_IMAGE} \
+    .
+```
+
+**Examples:**
+
+```bash
+# Add debugging and monitoring tools
+export USER_PACKAGES="vim htop strace tcpdump iperf3 curl wget"
+
+# Add storage-related utilities
+export USER_PACKAGES="lvm2 multipath-tools sg3_utils"
+
+# Add network debugging tools
+export USER_PACKAGES="nmap netcat-openbsd traceroute mtr"
+
+# Add development tools
+export USER_PACKAGES="git gcc make python3-pip"
+```
+
+**Important Notes:**
+
+- Package names must be valid for the base OS repository (CentOS Stream 9 or RHEL 9)
+- Packages must be available in the configured repositories
+- Adding too many packages will increase the image size
+- Verify package availability before building to avoid build failures
 
 ## Troubleshooting
 
