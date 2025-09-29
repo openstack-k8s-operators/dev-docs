@@ -137,9 +137,9 @@ Push the bootc container image to your registry:
 sudo podman push ${EDPM_BOOTC_IMAGE}
 ```
 
-## Step 6: Generate QCOW2 Disk Image (Optional)
+## Step 6: Generate a QCOW2 Disk Image (Optional)
 
-If you need a QCOW2 disk image for bare metal deployment:
+If you need a QCOW2 disk image for deployment:
 
 ```bash
 sudo podman run \
@@ -193,21 +193,6 @@ popd
 sudo podman push ${EDPM_QCOW2_IMAGE}
 ```
 
-## Step 8: Extract QCOW2 from Container (Usage)
-
-To extract the QCOW2 image from the container:
-
-```bash
-# Create directory for extracted images
-mkdir -p /path/to/extracted/images
-
-# Extract QCOW2 from container
-podman run \
-    --volume /path/to/extracted/images:/target:Z \
-    --rm \
-    ${EDPM_QCOW2_IMAGE}
-```
-
 ## Customization Options
 
 ### RHEL Subscription Management
@@ -220,6 +205,10 @@ For RHEL-based builds with subscription, modify `rhsm.sh`:
    RHSM_PASSWORD=your_password
    RHSM_POOL=your_pool_id  # Only if SCA is disabled
    ```
+
+2. Further edit `rhsm.sh` as needed, such as to run a `subscription-manager`
+   command with an activation key. Or, use any custom script to enable any
+   needed repositories.
 
 2. Use the RHEL subscription script:
    ```bash
@@ -347,6 +336,21 @@ The resulting bootc image includes:
 - **Security**: FIPS mode enabled by default
 - **Monitoring**: System monitoring and logging tools
 
+### Extract QCOW2 from Container (Usage)
+
+To extract the QCOW2 image from the container:
+
+```bash
+# Create directory for extracted images
+mkdir -p /path/to/extracted/images
+
+# Extract QCOW2 from container
+podman run \
+    --volume /path/to/extracted/images:/target:Z \
+    --rm \
+    ${EDPM_QCOW2_IMAGE}
+```
+
 ## Cleanup
 
 To clean up build artifacts:
@@ -405,14 +409,200 @@ oc get openstackdataplanedeployment
 oc logs -f deployment/dataplane-operator-controller-manager -n openstack-operators
 ```
 
-## Next Steps
+## Updating EDPM Bootc Nodes
 
-After building and pushing your images:
+For EDPM nodes deployed with bootc images, the update process differs from traditional RPM-based updates. This section explains how to update bootc-based EDPM nodes.
 
-1. **For Bare Metal**: Use the QCOW2 image for traditional bare metal
-   deployment through OpenStackDataPlaneNodeSet
-2. **Integration**: Configure your OpenStack deployment to use your custom
-   images as shown above
+### Overview
 
-For more information on deploying these images, refer to the OpenStack EDPM
-documentation.
+EDPM bootc nodes use a container-based operating system that can be updated by switching to new container images and rebooting.
+
+There are two update procedures, a single phase update and a two-phase update.
+With both procedures, OVN is still update initially on its own. It's the
+remainder of the update that is either a single phase update or a two-phase
+update.
+
+The single phase update process is described in [EDPM update procedures](edpm_update_overview.md). This procedure update the system and services simultaneously.
+
+The two-phase procedure (Technology Preview) updates the remaining services and
+system separately, as described in [new EDPM update
+overview](new_edpm_update_overview.md).
+
+Both of these procedures require special handling for bootc, and will be
+described below.
+
+#### Required Ansible Variable
+
+For both procedures, when updating the OS (system) of bootc nodes, you must specify the
+target bootc container image using the following ansible variable:
+
+```yaml
+edpm_update_system_bootc_os_container_image: "your-registry.example.com/edpm-bootc:updated-version"
+```
+
+See the examples below which show setting the variable on the
+OpenStackDataPlaneDeployment.
+
+### Single phase update procedure (system and services together)
+
+After updating OVN, update the rest of the EDPM services create an
+OpenStackDataPlaneDeployment in which runs the `update` service. This step is
+further described in [Updating other services on the data
+plane](https://openstack-k8s-operators.github.io/openstack-operator/dataplane/#proc_updating-the-data-plane-dataplane).
+
+1. **Build Updated Bootc Image**: First, build and push an updated bootc
+   container image with the desired changes using the procedures described
+   earlier in this document.
+
+2. Create `edpm-compute-bootc-update.yaml`
+
+```yaml
+apiVersion: dataplane.openstack.org/v1beta1
+kind: OpenStackDataPlaneDeployment
+metadata:
+  name: edpm-compute-bootc-update
+spec:
+  nodeSets:
+    - edpm-compute-bootc
+  servicesOverride:
+    - update
+    - reboot # Optional. Will automatically reboot the nodes
+  ansibleVars:
+    edpm_update_system_bootc_os_container_image: "your-registry.example.com/edpm-bootc:updated-version"
+```
+
+3. Apply `edpm-compute-bootc-update.yaml`
+
+```bash
+oc apply -f edpm-compute-bootc-update.yaml
+```
+
+4. Verify the OpenStackDataPlaneDeployment completes successfully.
+
+5. Reboot the nodes to activate the new image if the `reboot` service was not
+   included on the OpenStackDataPlaneDeployment.
+
+### Two-phase update procedure (system then services separately)
+
+#### Phase 1: OpenStack Services Update
+
+The first phase updates OpenStack service containers and essential RPM packages. For bootc nodes, this phase has special considerations:
+
+**Important for Bootc Nodes**: If you intend to run only `edpm_update_services`
+(Phase 1) but there is a newer version of `openstack-selinux` available, you
+**must first build and update to a new bootc image** that includes the updated
+`openstack-selinux` package.
+
+This is because bootc nodes cannot update individual RPM packages like
+`openstack-selinux` at runtime - all system packages must be included in the
+bootc container image. The high level process is:
+
+##### openstack-selinux update
+
+If necessary, perform the following steps to update only openstack-selinux on
+bootc nodes.
+
+1. **Check for openstack-selinux updates**: Verify if a newer version of `openstack-selinux` is available in your repositories
+
+2. **Build updated bootc image**: If needed, rebuild your bootc image with the newer `openstack-selinux` version
+
+3. Create `edpm-update-system-selinux.yaml`
+
+```yaml
+# Step 1: Update bootc image with newer openstack-selinux (if needed)
+apiVersion: dataplane.openstack.org/v1beta1
+kind: OpenStackDataPlaneDeployment
+metadata:
+  name: edpm-update-system-selinux
+spec:
+  nodeSets:
+    - edpm-compute-bootc
+  servicesOverride:
+    - update-system
+    - reboot # Optional. Will automatically reboot the nodes
+  ansibleVars:
+    edpm_update_system_bootc_os_container_image: "your-registry.example.com/edpm-bootc:updated-selinux"
+```
+
+4. Apply `edpm-update-system-selinux.yaml`
+
+```bash
+oc apply -f edpm-update-system-selinux.yaml
+```
+
+5. Reboot the nodes to activate the new image if the `reboot` service was not
+   included on the OpenStackDataPlaneDeployment.
+
+6. Create `edpm-update-services-bootc.yaml` Deployment to update the services.
+
+```yaml
+# Step 2: Update OpenStack services
+apiVersion: dataplane.openstack.org/v1beta1
+kind: OpenStackDataPlaneDeployment
+metadata:
+  name: edpm-update-services-bootc
+spec:
+  nodeSets:
+    - edpm-compute-bootc
+  servicesOverride:
+    - update-services
+```
+
+7. Apply `edpm-update-services-bootc.yaml`
+
+```bash
+oc apply -f edpm-update-services-bootc.yaml
+```
+
+8. Verify the OpenStackDataPlaneDeployment completes successfully.
+
+No reboot is required since only the remaining services were updated.
+
+#### Phase 2: System Update (Bootc Image Switch)
+
+**Important**: For bootc nodes, the system update phase requires switching to a new bootc container image instead of updating individual RPM packages.
+
+1. **Build Updated Bootc Image**: First, build and push an updated bootc container image with the desired changes using the procedures described earlier in this document.
+
+2. Create `edpm-update-bootc.yaml` to update the bootc system, and specify the
+   image built in the previous step.
+
+```yaml
+apiVersion: dataplane.openstack.org/v1beta1
+kind: OpenStackDataPlaneDeployment
+metadata:
+  name: edpm-update-bootc
+spec:
+  nodeSets:
+    - edpm-compute-bootc
+  servicesOverride:
+    - update-system
+    - reboot # Optional. Will automatically reboot the nodes
+  ansibleVars:
+    # Specify the new bootc image to switch to
+    edpm_update_system_bootc_os_container_image: "your-registry.example.com/edpm-bootc:new-version"
+```
+
+3. Apply `edpm-update-bootc.yaml`
+
+```bash
+oc apply -f edpm-update-bootc.yaml
+```
+
+4. Verify the OpenStackDataPlaneDeployment completes successfully.
+
+5. Reboot the nodes to activate the new image if the `reboot` service was not
+   included on the OpenStackDataPlaneDeployment.
+
+### Important Considerations
+
+- **Reboot Requirement**: Unlike traditional RPM updates, bootc image switches always require a reboot to take effect
+- **openstack-selinux Dependencies**: Always check if `edpm_update_services` requires a newer version of `openstack-selinux` before proceeding. If so, build and switch to an updated bootc image first
+- **Maintenance Windows**: Schedule the system update phase during planned maintenance windows due to the reboot requirement
+- **Image Availability**: Ensure the target bootc image is accessible from all EDPM nodes before starting the update
+- **Package Updates**: Remember that bootc nodes cannot update individual RPM packages - all updates must be included in the bootc container image
+- **Rollback**: Bootc supports rollback to previous images using `bootc rollback` if issues occur
+- **Verification**: After reboot, verify the new image is active using `bootc status`
+
+
+For more information on deploying and updating these images, refer to the OpenStack EDPM documentation and the update procedure guides linked above.
