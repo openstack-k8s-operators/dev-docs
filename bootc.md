@@ -35,20 +35,44 @@ export EDPM_QCOW2_IMAGE="${EDPM_BOOTC_REPO}:${EDPM_BOOTC_TAG}-qcow2"
 
 # Build configuration
 export EDPM_BASE_IMAGE="quay.io/centos-bootc/centos-bootc:stream9"
-export BUILDER_IMAGE="quay.io/centos-bootc/bootc-image-builder:latest"
 export EDPM_CONTAINERFILE="Containerfile"
 export RHSM_SCRIPT="empty.sh"  # Use "rhsm.sh" for RHEL with subscription
 export FIPS="1"  # Set to "0" to disable FIPS mode
 export USER_PACKAGES=""  # Space-separated list of additional packages to install
 ```
 
-## Step 1: Clone the Repository
+## Step 1: Obtain initial build content
+
+The files and content to build the bootc image can be obtained by either
+cloning the edpm-image-builder, or downloading the files.
+
+### Obtain initial build content by cloning the repository
 
 Clone the edpm-image-builder repository:
 
 ```bash
 git clone https://github.com/openstack-k8s-operators/edpm-image-builder.git
 cd edpm-image-builder
+```
+
+### Obtain initial build content by downloading
+
+Download the necessary files:
+
+```bash
+mkdir -p bootc
+pushd bootc
+curl -O https://raw.githubusercontent.com/openstack-k8s-operators/edpm-image-builder/55ba53cf215b14ed95bc80c8e8ed4b29a45fd4ae/bootc/Containerfile
+curl -O https://raw.githubusercontent.com/openstack-k8s-operators/edpm-image-builder/refs/heads/main/bootc/rhsm.sh
+chmod +x rhsm.sh
+mkdir ansible-facts
+pushd ansible-facts
+curl -O https://raw.githubusercontent.com/openstack-k8s-operators/edpm-image-builder/55ba53cf215b14ed95bc80c8e8ed4b29a45fd4ae/bootc/ansible-facts/bootc.fact
+popd
+popd
+curl -O https://raw.githubusercontent.com/openstack-k8s-operators/edpm-image-builder/55ba53cf215b14ed95bc80c8e8ed4b29a45fd4ae/Containerfile.image
+curl -O https://raw.githubusercontent.com/openstack-k8s-operators/edpm-image-builder/55ba53cf215b14ed95bc80c8e8ed4b29a45fd4ae/copy_out.sh
+chmod +x copy_out.sh
 ```
 
 ## Step 2: Prepare the Build Environment
@@ -62,12 +86,14 @@ cd bootc/
 Create the output directory:
 
 ```bash
-mkdir -p output
+mkdir -p output/yum.repos.d
 ```
 
 ## Step 3: Set Up Repository Configuration
 
-### Download and Install repo-setup Tool
+### Centos Stream 9
+
+#### Download and Install repo-setup Tool
 
 ```bash
 pushd output
@@ -80,7 +106,7 @@ cp venv/bin/repo-setup ../repo-setup
 popd
 ```
 
-### Generate Repository Configuration
+#### Generate Repository Configuration
 
 Configure the OpenStack rpm repositories to use during the container image
 build:
@@ -104,7 +130,48 @@ repo-setup \
 popd
 ```
 
+### RHEL 9.2+
+
+For RHEL-based builds with subscription-manager, modify `rhsm.sh`:
+
+1. Edit the subscription variables in `rhsm.sh`:
+   ```bash
+   RHSM_USER=your_username
+   RHSM_PASSWORD=your_password
+   RHSM_POOL=your_pool_id  # Only if SCA is disabled
+   ```
+
+2. Further edit `rhsm.sh` as needed, such as to run a `subscription-manager`
+   command with an activation key. Or, use any custom script to enable any
+   needed repositories.
+
+2. Use the RHEL subscription script:
+   ```bash
+   export RHSM_SCRIPT="rhsm.sh"
+   ```
+
 ## Step 4: Build the Bootc Container Image
+
+### Configure Base Image
+
+You can use different base images:
+
+> #### RHEL 9.2+
+> ```bash
+> # For RHEL 9 (requires subscription)
+> export EDPM_BASE_IMAGE="registry.redhat.io/rhel9/rhel-bootc:9.4"
+> ```
+>
+> Login to registry.redhat.io
+> ```bash
+> sudo podman login registry.redhat.io
+> ```
+
+> #### Centos Stream 9
+> ```bash
+> # For CentOS Stream 9 (default)
+> export EDPM_BASE_IMAGE="quay.io/centos-bootc/centos-bootc:stream9"
+> ```
 
 Build the EDPM bootc container image:
 
@@ -140,6 +207,16 @@ sudo podman push ${EDPM_BOOTC_IMAGE}
 ## Step 6: Generate a QCOW2 Disk Image (Optional)
 
 If you need a QCOW2 disk image for deployment:
+
+> ### RHEL 9.2+
+> ```bash
+> export BUILDER_IMAGE="registry.redhat.io/rhel9/bootc-image-builder:latest"
+> ```
+
+> ### Centos Stream 9
+> ```bash
+> export BUILDER_IMAGE="quay.io/centos-bootc/bootc-image-builder:latest"
+> ```
 
 ```bash
 sudo podman run \
@@ -177,10 +254,23 @@ cp ../Containerfile.image output/
 
 ### Build the QCOW2 container:
 
+> #### RHEL 9.2+
+>
+> ```bash
+> export BASE_IMAGE=registry.redhat.io/rhel9-4-els/rhel:9.4
+> ```
+
+> #### Centos Stream 9
+>
+> ```bash
+> export BASE_IMAGE=quay.io/centos/centos:stream9-minimal
+> ```
+
 ```bash
 pushd output
 sudo buildah bud \
     --build-arg IMAGE_NAME=edpm-bootc \
+    --build-arg BASE_IMAGE=${BASE_IMAGE}
     -f ./Containerfile.image \
     -t ${EDPM_QCOW2_IMAGE} \
     .
@@ -194,38 +284,6 @@ sudo podman push ${EDPM_QCOW2_IMAGE}
 ```
 
 ## Customization Options
-
-### RHEL Subscription Management
-
-For RHEL-based builds with subscription, modify `rhsm.sh`:
-
-1. Edit the subscription variables in `rhsm.sh`:
-   ```bash
-   RHSM_USER=your_username
-   RHSM_PASSWORD=your_password
-   RHSM_POOL=your_pool_id  # Only if SCA is disabled
-   ```
-
-2. Further edit `rhsm.sh` as needed, such as to run a `subscription-manager`
-   command with an activation key. Or, use any custom script to enable any
-   needed repositories.
-
-2. Use the RHEL subscription script:
-   ```bash
-   export RHSM_SCRIPT="rhsm.sh"
-   ```
-
-### Base Image Options
-
-You can use different base images:
-
-```bash
-# For RHEL 9 (requires subscription)
-export EDPM_BASE_IMAGE="registry.redhat.io/rhel9/rhel-bootc:latest"
-
-# For CentOS Stream 9 (default)
-export EDPM_BASE_IMAGE="quay.io/centos-bootc/centos-bootc:stream9"
-```
 
 ### FIPS Configuration
 
