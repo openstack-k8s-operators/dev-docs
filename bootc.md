@@ -7,7 +7,7 @@ bootc container images and QCOW2 disk images to your own container registry.
 
 ### System Requirements
 
-- RHEL 9.2+, CentOS Stream 9, or Fedora 41+ host system.
+- RHEL 9.4+, CentOS Stream 9, or Fedora 41+ host system.
 - sudo access for privileged container operations
 - At least 10GB of free disk space
 - Container registry access (push permissions)
@@ -130,7 +130,7 @@ repo-setup \
 popd
 ```
 
-### RHEL 9.2+
+### RHEL 9.4+
 
 For RHEL-based builds with subscription-manager, modify `rhsm.sh`:
 
@@ -156,7 +156,7 @@ For RHEL-based builds with subscription-manager, modify `rhsm.sh`:
 
 You can use different base images:
 
-> #### RHEL 9.2+
+> #### RHEL 9.4+
 > ```bash
 > # For RHEL 9 (requires subscription)
 > export EDPM_BASE_IMAGE="registry.redhat.io/rhel9/rhel-bootc:9.4"
@@ -208,7 +208,7 @@ sudo podman push ${EDPM_BOOTC_IMAGE}
 
 If you need a QCOW2 disk image for deployment:
 
-> ### RHEL 9.2+
+> ### RHEL 9.4+
 > ```bash
 > export BUILDER_IMAGE="registry.redhat.io/rhel9/bootc-image-builder:latest"
 > ```
@@ -254,7 +254,7 @@ cp ../Containerfile.image output/
 
 ### Build the QCOW2 container:
 
-> #### RHEL 9.2+
+> #### RHEL 9.4+
 >
 > ```bash
 > export BASE_IMAGE=registry.redhat.io/rhel9-4-els/rhel:9.4
