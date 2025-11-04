@@ -270,7 +270,7 @@ cp ../Containerfile.image output/
 pushd output
 sudo buildah bud \
     --build-arg IMAGE_NAME=edpm-bootc \
-    --build-arg BASE_IMAGE=${BASE_IMAGE}
+    --build-arg BASE_IMAGE=${BASE_IMAGE} \
     -f ./Containerfile.image \
     -t ${EDPM_QCOW2_IMAGE} \
     .
