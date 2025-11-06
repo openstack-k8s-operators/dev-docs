@@ -228,7 +228,6 @@ sudo podman run \
     -v /var/lib/containers/storage:/var/lib/containers/storage \
     ${BUILDER_IMAGE} \
     --type qcow2 \
-    --local \
     ${EDPM_BOOTC_IMAGE}
 ```
 
