@@ -65,7 +65,7 @@ pushd bootc
 curl -O https://raw.githubusercontent.com/openstack-k8s-operators/edpm-image-builder/55ba53cf215b14ed95bc80c8e8ed4b29a45fd4ae/bootc/Containerfile
 curl -O https://raw.githubusercontent.com/openstack-k8s-operators/edpm-image-builder/refs/heads/main/bootc/rhsm.sh
 chmod +x rhsm.sh
-mkdir ansible-facts
+mkdir -p ansible-facts
 pushd ansible-facts
 curl -O https://raw.githubusercontent.com/openstack-k8s-operators/edpm-image-builder/55ba53cf215b14ed95bc80c8e8ed4b29a45fd4ae/bootc/ansible-facts/bootc.fact
 popd
