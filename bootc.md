@@ -523,7 +523,7 @@ spec:
     - edpm-compute-bootc
   servicesOverride:
     - update
-    - reboot # Optional. Will automatically reboot the nodes
+    - reboot-os # Optional. Will automatically reboot the nodes
   ansibleVars:
     edpm_update_system_bootc_os_container_image: "your-registry.example.com/edpm-bootc:updated-version"
 ```
@@ -536,7 +536,7 @@ oc apply -f edpm-compute-bootc-update.yaml
 
 4. Verify the OpenStackDataPlaneDeployment completes successfully.
 
-5. Reboot the nodes to activate the new image if the `reboot` service was not
+5. Reboot the nodes to activate the new image if the `reboot-os` service was not
    included on the OpenStackDataPlaneDeployment.
 
 ### Two-phase update procedure (system then services separately)
@@ -576,7 +576,7 @@ spec:
     - edpm-compute-bootc
   servicesOverride:
     - update-system
-    - reboot # Optional. Will automatically reboot the nodes
+    - reboot-os # Optional. Will automatically reboot the nodes
   ansibleVars:
     edpm_update_system_bootc_os_container_image: "your-registry.example.com/edpm-bootc:updated-selinux"
 ```
@@ -587,7 +587,7 @@ spec:
 oc apply -f edpm-update-system-selinux.yaml
 ```
 
-5. Reboot the nodes to activate the new image if the `reboot` service was not
+5. Reboot the nodes to activate the new image if the `reboot-os` service was not
    included on the OpenStackDataPlaneDeployment.
 
 6. Create `edpm-update-services-bootc.yaml` Deployment to update the services.
@@ -634,7 +634,7 @@ spec:
     - edpm-compute-bootc
   servicesOverride:
     - update-system
-    - reboot # Optional. Will automatically reboot the nodes
+    - reboot-os # Optional. Will automatically reboot the nodes
   ansibleVars:
     # Specify the new bootc image to switch to
     edpm_update_system_bootc_os_container_image: "your-registry.example.com/edpm-bootc:new-version"
@@ -648,7 +648,7 @@ oc apply -f edpm-update-bootc.yaml
 
 4. Verify the OpenStackDataPlaneDeployment completes successfully.
 
-5. Reboot the nodes to activate the new image if the `reboot` service was not
+5. Reboot the nodes to activate the new image if the `reboot-os` service was not
    included on the OpenStackDataPlaneDeployment.
 
 ### Important Considerations
