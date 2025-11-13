@@ -494,7 +494,7 @@ For both procedures, when updating the OS (system) of bootc nodes, you must spec
 target bootc container image using the following ansible variable:
 
 ```yaml
-edpm_update_system_bootc_os_container_image: "your-registry.example.com/edpm-bootc:updated-version"
+edpm_update_system_bootc_os_container_image: '"your-registry.example.com/edpm-bootc:updated-version"' # Single and double quote are required.
 ```
 
 See the examples below which show setting the variable on the
@@ -524,8 +524,8 @@ spec:
   servicesOverride:
     - update
     - reboot-os # Optional. Will automatically reboot the nodes
-  ansibleVars:
-    edpm_update_system_bootc_os_container_image: "your-registry.example.com/edpm-bootc:updated-version"
+  ansibleExtraVars:
+    edpm_update_system_bootc_os_container_image: '"your-registry.example.com/edpm-bootc:updated-version"' # This entry will be parsed as raw json therefore the single and double quotes are required.
 ```
 
 3. Apply `edpm-compute-bootc-update.yaml`
@@ -577,8 +577,8 @@ spec:
   servicesOverride:
     - update-system
     - reboot-os # Optional. Will automatically reboot the nodes
-  ansibleVars:
-    edpm_update_system_bootc_os_container_image: "your-registry.example.com/edpm-bootc:updated-selinux"
+  ansibleExtraVars:
+    edpm_update_system_bootc_os_container_image: `"your-registry.example.com/edpm-bootc:updated-selinux"` # This entry will be parsed as raw json therefore the single and double quotes are required.
 ```
 
 4. Apply `edpm-update-system-selinux.yaml`
@@ -635,9 +635,9 @@ spec:
   servicesOverride:
     - update-system
     - reboot-os # Optional. Will automatically reboot the nodes
-  ansibleVars:
+  ansibleExtraVars:
     # Specify the new bootc image to switch to
-    edpm_update_system_bootc_os_container_image: "your-registry.example.com/edpm-bootc:new-version"
+    edpm_update_system_bootc_os_container_image: '"your-registry.example.com/edpm-bootc:new-version"' # This entry will be parsed as raw json therefore the single and double quotes are required.
 ```
 
 3. Apply `edpm-update-bootc.yaml`
