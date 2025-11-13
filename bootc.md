@@ -524,7 +524,7 @@ spec:
   servicesOverride:
     - update
     - reboot-os # Optional. Will automatically reboot the nodes
-  ansibleVars:
+  ansibleExtraVars:
     edpm_update_system_bootc_os_container_image: "your-registry.example.com/edpm-bootc:updated-version"
 ```
 
@@ -577,7 +577,7 @@ spec:
   servicesOverride:
     - update-system
     - reboot-os # Optional. Will automatically reboot the nodes
-  ansibleVars:
+  ansibleExtraVars:
     edpm_update_system_bootc_os_container_image: "your-registry.example.com/edpm-bootc:updated-selinux"
 ```
 
@@ -635,7 +635,7 @@ spec:
   servicesOverride:
     - update-system
     - reboot-os # Optional. Will automatically reboot the nodes
-  ansibleVars:
+  ansibleExtraVars:
     # Specify the new bootc image to switch to
     edpm_update_system_bootc_os_container_image: "your-registry.example.com/edpm-bootc:new-version"
 ```
