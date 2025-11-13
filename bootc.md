@@ -494,7 +494,7 @@ For both procedures, when updating the OS (system) of bootc nodes, you must spec
 target bootc container image using the following ansible variable:
 
 ```yaml
-edpm_update_system_bootc_os_container_image: '"your-registry.example.com/edpm-bootc:updated-version"' # Single and double quote are required.
+edpm_update_system_bootc_os_container_image: "your-registry.example.com/edpm-bootc:updated-version"
 ```
 
 See the examples below which show setting the variable on the
@@ -525,7 +525,7 @@ spec:
     - update
     - reboot-os # Optional. Will automatically reboot the nodes
   ansibleExtraVars:
-    edpm_update_system_bootc_os_container_image: '"your-registry.example.com/edpm-bootc:updated-version"' # This entry will be parsed as raw json therefore the single and double quotes are required.
+    edpm_update_system_bootc_os_container_image: "your-registry.example.com/edpm-bootc:updated-version"
 ```
 
 3. Apply `edpm-compute-bootc-update.yaml`
@@ -578,7 +578,7 @@ spec:
     - update-system
     - reboot-os # Optional. Will automatically reboot the nodes
   ansibleExtraVars:
-    edpm_update_system_bootc_os_container_image: `"your-registry.example.com/edpm-bootc:updated-selinux"` # This entry will be parsed as raw json therefore the single and double quotes are required.
+    edpm_update_system_bootc_os_container_image: "your-registry.example.com/edpm-bootc:updated-selinux"
 ```
 
 4. Apply `edpm-update-system-selinux.yaml`
@@ -637,7 +637,7 @@ spec:
     - reboot-os # Optional. Will automatically reboot the nodes
   ansibleExtraVars:
     # Specify the new bootc image to switch to
-    edpm_update_system_bootc_os_container_image: '"your-registry.example.com/edpm-bootc:new-version"' # This entry will be parsed as raw json therefore the single and double quotes are required.
+    edpm_update_system_bootc_os_container_image: "your-registry.example.com/edpm-bootc:new-version"
 ```
 
 3. Apply `edpm-update-bootc.yaml`
