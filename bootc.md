@@ -526,7 +526,10 @@ spec:
     - reboot-os # Optional. Will automatically reboot the nodes
   ansibleExtraVars:
     edpm_update_system_bootc_os_container_image: "your-registry.example.com/edpm-bootc:updated-version"
+    edpm_reboot_strategy: force # Optional, required when using reboot-os with already deployed nodes
 ```
+
+**Important:** When using the `reboot-os` service with `edpm_reboot_strategy: force`, reboots are immediate and disruptive. A forced reboot will terminate all running processes, which may cause workload interruption. There is no reverting from a forced reboot once initiated. Always plan forced reboots during scheduled maintenance windows and ensure all critical services are properly prepared for immediate shutdown. Please follow the instruction on [Rebooting Compute Nodes](https://docs.redhat.com/en/documentation/red_hat_openstack_services_on_openshift/18.0/html/updating_your_environment_to_the_latest_maintenance_release/proc_rebooting-compute-nodes_perform-update) to plan your reboot.
 
 3. Apply `edpm-compute-bootc-update.yaml`
 
@@ -579,7 +582,10 @@ spec:
     - reboot-os # Optional. Will automatically reboot the nodes
   ansibleExtraVars:
     edpm_update_system_bootc_os_container_image: "your-registry.example.com/edpm-bootc:updated-selinux"
+    edpm_reboot_strategy: force # Optional, required when using reboot-os with already deployed nodes
 ```
+
+**Important:** When using the `reboot-os` service with `edpm_reboot_strategy: force`, reboots are immediate and disruptive. A forced reboot will terminate all running processes, which may cause workload interruption. There is no reverting from a forced reboot once initiated. Always plan forced reboots during scheduled maintenance windows and ensure all critical services are properly prepared for immediate shutdown. Please follow the instruction on [Rebooting Compute Nodes](https://docs.redhat.com/en/documentation/red_hat_openstack_services_on_openshift/18.0/html/updating_your_environment_to_the_latest_maintenance_release/proc_rebooting-compute-nodes_perform-update) to plan your reboot.
 
 4. Apply `edpm-update-system-selinux.yaml`
 
@@ -638,7 +644,10 @@ spec:
   ansibleExtraVars:
     # Specify the new bootc image to switch to
     edpm_update_system_bootc_os_container_image: "your-registry.example.com/edpm-bootc:new-version"
+    edpm_reboot_strategy: force # Optional, required when using reboot-os with already deployed nodes
 ```
+
+**Important:** When using the `reboot-os` service with `edpm_reboot_strategy: force`, reboots are immediate and disruptive. A forced reboot will terminate all running processes, which may cause workload interruption. There is no reverting from a forced reboot once initiated. Always plan forced reboots during scheduled maintenance windows and ensure all critical services are properly prepared for immediate shutdown. Please follow the instruction on [Rebooting Compute Nodes](https://docs.redhat.com/en/documentation/red_hat_openstack_services_on_openshift/18.0/html/updating_your_environment_to_the_latest_maintenance_release/proc_rebooting-compute-nodes_perform-update) to plan your reboot.
 
 3. Apply `edpm-update-bootc.yaml`
 
