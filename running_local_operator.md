@@ -71,6 +71,8 @@ oc patch deployment -n openstack-operators <service operator deployment> --type 
   -p="[{"op": "replace", "path": "/spec/replicas", "value": "0"}]"
 ```
 
+3. Then [remove the webhooks](https://github.com/openstack-k8s-operators/dev-docs/blob/main/webhooks.md#disabling-webhooks)
+
 ## An Alternative Approach Provided by ChatGPT (FR1 and earlier)
 
 In Kubernetes, CSV (Cluster Service Version) is a Custom Resource Definition (CRD) that enables the operator to manage the lifecycle of a specific application in a Kubernetes cluster. The CSV defines the deployment strategy, dependencies, and upgrade paths for the application.
