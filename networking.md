@@ -4,6 +4,12 @@
 
 ![Network diagram](images/network_diagram.jpg)
 
+## Network Overview
+
+The diagram below provides an example of a network topology where the networks are isolated on separate VLANs. Each node uses an optional nic1 which can be used for provisioning the base operating system using metal3. Additional two interfaces (nic2 and nic3) in a bond to deliver the OpenStack networks over their respective VLANs. The OCP worker nodes has an additional bond (nic4 and nic5 used for the OCP cluster traffic and exposing the OCP routes.
+
+![Network topology](images/network_overview.jpg)
+
 ### Ingress
 
 #### Public endpoints
