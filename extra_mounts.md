@@ -108,7 +108,7 @@ spec:
         - name: v2
           region: r1
           extraVol:
-              volumes:
+            - volumes:
               - name: ceph-1
                 secret:
                   name: ceph-conf-files-1
