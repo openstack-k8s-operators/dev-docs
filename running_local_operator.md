@@ -164,3 +164,8 @@ Then pass an available port for the `METRICS_PORT` when running the operator:
 ```
 $ METRICS_PORT=8082 make run
 ```
+
+## Running kuttl tests with the local operator
+
+See [kuttl_tests.md](kuttl_tests.md#using-a-local-operator) for steps on how to run kuttl tests
+with the local operator.
