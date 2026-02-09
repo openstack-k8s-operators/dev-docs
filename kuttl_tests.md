@@ -101,3 +101,61 @@ be executed and the rest is ignored by kuttl.
 
 * If you use scripts in TestStep or TestAssert then add `set -euxo pipefail`
 to the start of the script to ensure that no error is ignored.
+
+Running kuttl tests for an operator
+===================================
+kuttl tests are run from
+[install_yamls](https://github.com/openstack-k8s-operators/install_yamls).
+There are makefile targets in
+[Makefile](https://github.com/openstack-k8s-operators/install_yamls/blob/main/Makefile)
+for running each operator's kuttl tests named `${OPERATOR_NAME}_kuttl`.
+
+The `${OPERATOR_NAME}_kuttl` targets take care of setup, running kuttl tests,
+and cleanup. They can be run from a crc environment setup by install_yamls, or
+other similar OCP environments. These are also the targets used by prow CI and
+called from the [openstack-k8s-operators-kuttl-commands.sh](https://github.com/openshift/release/blob/master/ci-operator/step-registry/openstack-k8s-operators/kuttl/openstack-k8s-operators-kuttl-commands.sh) script.
+
+Using a local operator
+----------------------
+The `${OPERATOR_NAME}_kuttl_prep` targets can be used to prepare the
+environment before running the actual tests. This is useful if more control is
+desired in how the tests get executed, or to execute the tests from a custom
+git checkout of a local operator for faster development iteration of tests.
+
+For example, to prepare the environment for running `openstack-operator` kuttl
+tests, and then running the tests from a different checkout the following steps
+can be used. The steps assume checkouts of `install_yamls` and
+`openstack-operator` as sibling directories.
+
+```
+cd install_yamls
+make openstack_kuttl_prep
+```
+
+Follow the steps in [running_local_operator.md](running_local_operator.md) to
+scale down the operator and run it locally from the git checkout.
+
+Use the `kuttl-test` target from the git checkout to run kuttl tests:
+
+```
+make kuttl-test KUTTL_ARGS="<...>"
+```
+
+In the above example, the `kuttl-test` target from `openstack-operator` along
+with the `${KUTTL_ARGS}` variable are used to further control how kuttl
+executes.
+
+For example, to execute a single test and skip the test cleanup so that the
+resources can be inspected after the test:
+
+```
+make kuttl-test KUTTL_ARGS="--test dataplane-deploy-no-nodes-test --skip-delete"
+```
+
+After the testing is done, the environment can be cleaned up with the
+`${OPERATOR_NAME}_kuttl_cleanup` targets from install_yamls:
+
+```
+cd install_yamls
+make openstack_kuttl_cleanup
+```
