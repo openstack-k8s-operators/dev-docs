@@ -8,6 +8,8 @@
 
 The diagram below provides an example of a network topology where the networks are isolated on separate VLANs. Each node uses an optional nic1 which can be used for provisioning the base operating system using metal3. Additional two interfaces (nic2 and nic3) in a bond to deliver the OpenStack networks over their respective VLANs. The OCP worker nodes has an additional bond (nic4 and nic5 used for the OCP cluster traffic and exposing the OCP routes.
 
+If provider networks are used, a dedicated nic is required on OCP workers (nic6), as here OVS running in a pod and host-device pluging moves node NIC to pod network namespace (ovs-bridge creation, interface add, ovn-bridge-mappings set are taken care by ovn-operator). On EDPM nodes it can be shared the requirement for provider network is to have an OVS bridge (backed by physical NIC or bond) and that bridge/NIC can have other RHOSO networks configured.
+
 ![Network topology](images/network_overview.jpg)
 
 ### Ingress
