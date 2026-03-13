@@ -33,3 +33,4 @@ Developer Documentation related to podified controlplane.
 * [Bumping dependencies](bumping_dependencies.md)
 * [Adding shell commands in pod containers](adding_shell_commands.md)
 * [Hotfix process - Building custom OpenStack Images](hotfix_process.md)
+* [Application Credentials](application_credentials.md)
