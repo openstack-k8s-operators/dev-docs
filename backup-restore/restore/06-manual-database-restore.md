@@ -132,5 +132,5 @@ oc delete galerarestore openstackrestorecell1 -n openstack
 ## Next Steps
 
 After database restore, return to the main restore procedure in
-[README.md](README.md#step-6b-rabbitmq-credential-restore) for
-RabbitMQ credential restore and removing the deployment-stage annotation.
+[README.md](README.md#step-6b-remove-deployment-stage-annotation) to
+remove the deployment-stage annotation and resume full deployment.

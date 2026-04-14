@@ -52,7 +52,7 @@ To disable: `-e cifmw_backup_restore_snapshot_move_data=false`.
 | [`minio/`](minio/) | MinIO deployment (S3-compatible storage for OADP) |
 | [`oadp/`](oadp/) | OADP operator installation and configuration |
 | [`backup/`](backup/) | OADP Backup CR reference |
-| [`restore/`](restore/) | OADP Restore CR reference, manual database and RabbitMQ restore |
+| [`restore/`](restore/) | OADP Restore CR reference, manual database restore |
 | [`backup-restore-controller-design.md`](backup-restore-controller-design.md) | Design: CRD labels, controller-based labeling, restore ordering |
 | [`backup-restore-controller-implementation.md`](backup-restore-controller-implementation.md) | Implementation guide for the OpenStackBackupConfig controller |
 | [`backup-restore-pvc-enhancement.md`](backup-restore-pvc-enhancement.md) | Enhancement proposal: serialize CRs to PVC |
@@ -121,7 +121,7 @@ versions, see [`restore/README.md`](restore/README.md) for workarounds.
 
 | Component | Backed Up | NOT Backed Up |
 |-----------|-----------|---------------|
-| ControlPlane | OpenStackControlPlane, OpenStackVersion, NADs, Secrets, ConfigMaps, GaleraBackup, Topology, BGPConfiguration, DNSData, InstanceHa, Database contents (Galera dumps), PVCs (Glance, GaleraBackup), RabbitMQ user credentials | Individual service CRs (recreated by controller), MariaDBDatabase/Account (recreated by operators), Certificate CRs (recreated by operators), Running pods, OVN database contents, RabbitMQ queue data (fresh cluster) |
+| ControlPlane | OpenStackControlPlane, OpenStackVersion, NADs, Secrets, ConfigMaps, GaleraBackup, Topology, BGPConfiguration, DNSData, InstanceHa, Database contents (Galera dumps), PVCs (Glance, GaleraBackup), RabbitMQ default-user credentials (labeled by infra-operator) | Individual service CRs (recreated by controller), MariaDBDatabase/Account (recreated by operators), Certificate CRs (recreated by operators), Running pods, OVN database contents, RabbitMQ queue data (fresh cluster) |
 | DataPlane | NetConfig, OpenStackDataPlaneNodeSet, OpenStackDataPlaneService, Reservation, IPSet, OpenStackDataPlaneDeployment (backed up but not restored, to avoid triggering new deployments) | — |
 
 **ExtraMounts PVCs:** PVCs passed via `extraMounts` (global or per-service)
@@ -143,8 +143,7 @@ for the full table.
 | 20 | OpenStackVersion, Issuers, NetConfig, Topology, etc. | Infrastructure base |
 | 30 | OpenStackControlPlane | With `deployment-stage: infrastructure-only` |
 | 40 | GaleraBackup, IPSet, DataPlaneService | Backup config and IP sets |
-| 50 | **Manual**: Database restore | Create GaleraRestore CRs, run restore |
-| 55 | **Manual**: RabbitMQ credentials | Restore old secrets, create RabbitMQUser CRs |
+| 50 | **Manual**: Database restore, resume deployment | Create GaleraRestore CRs, run restore, remove `deployment-stage` annotation |
 | 60 | OpenStackDataPlaneNodeSet | DataPlane resources (optional) |
 
 ## Features Enabling Backup/Restore
@@ -168,9 +167,10 @@ the restored control plane state. This applies to:
   last deployment run, which may not match. Additionally, if the backup is
   old, restored ACs may already be expired in the DB, requiring immediate
   rotation.
-- **RabbitMQ**: The restored credentials (via `*-restored-user` secrets)
-  match the backup, but EDPM nodes may have been updated with newer
-  credentials since.
+- **RabbitMQ**: The default-user secret is labeled for restore by the
+  infra-operator. The RabbitMQ controller reuses existing credentials
+  when creating the new cluster. EDPM nodes may have been updated with
+  newer credentials since the backup.
 - **TLS/CA certificates**: If CAs were rotated between backup and restore,
   the restored control plane uses the old CA. EDPM nodes may have
   certificates signed by a newer CA, causing TLS trust failures in both

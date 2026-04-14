@@ -55,7 +55,7 @@ metadata:
     - 20 (TLS & infrastructure - custom Issuers, MariaDB, NetConfig, OpenStackVersion)
     - 30 (CtlPlane + networking)
     - 40 (backup config & user resources)
-    - 50 (manual steps - database/RabbitMQ restore, resume deployment)
+    - 50 (manual steps - database restore, resume deployment)
     - 60 (DataPlane)
 
 **Restore Strategy:**
@@ -680,19 +680,16 @@ The restore sequence is critical for maintaining dependencies between resources.
 | 10 | NetworkAttachmentDefinitions<br>Secrets (user-provided)<br>ConfigMaps (user-provided) | **Foundation Resources**: Core resources with no dependencies<br>Includes CA certs, DB passwords, SSH keys |
 | 20 | OpenStackVersion<br>Custom TLS Issuers<br>Infrastructure CRs<br>NetConfig<br>InstanceHa | **Version & Infrastructure**: OpenStackVersion restored first (required by ControlPlane)<br>Custom Issuers need CA secrets from order 10; operator-created Issuers are not restored (recreated by reconciliation)<br>Infrastructure: Topology, BGPConfiguration, DNSData<br>NetConfig: Network topology (required by Reservation/IPSet)<br>InstanceHa: Restored with `spec.disabled: True` (resource modifier) to prevent fencing; re-enable after verifying EDPM connectivity |
 | 30 | OpenStackControlPlane<br>Reservation | **Control Plane + Networking**: CtlPlane restored with staged deployment annotation (`deployment-stage: infrastructure-only`)<br>ControlPlane controller will use the already-restored OpenStackVersion from order 20<br>Reservation needs NetConfig from order 20<br>Wait for infrastructure ready before proceeding |
-| 40 | IPSet<br>GaleraBackup<br>RabbitMQUser (user-created)<br>RabbitMQVhost<br>DataPlaneService (user-created) | **IP Sets, Backup Config & User Resources** (while in infra-only mode)<br>IPSet: Requires Reservation from order 30<br>GaleraBackup: Backup configuration CR (needs CtlPlane)<br>RabbitMQUser/Vhost: User-created resources only (no ownerReferences)<br>DataPlaneService: Custom services before NodeSets |
-| 50 | *Database Restore*<br>*RabbitMQ Credentials*<br>*Resume Deployment* | **Manual/Controller** (while in infra-only mode):<br>1. Create GaleraRestore CRs, execute restore from PVCs (order 00), clean up<br>2. Create RabbitMQUser CRs with old credentials (extract from backed-up secrets, create new `-restored-user` secrets/CRs)<br>3. Remove `deployment-stage` annotation → CtlPlane reconciles and starts all services |
+| 40 | IPSet<br>GaleraBackup<br>DataPlaneService (user-created) | **IP Sets, Backup Config & User Resources** (while in infra-only mode)<br>IPSet: Requires Reservation from order 30<br>GaleraBackup: Backup configuration CR (needs CtlPlane)<br>DataPlaneService: Custom services before NodeSets |
+| 50 | *Database Restore*<br>*Resume Deployment* | **Manual/Controller** (while in infra-only mode):<br>1. Create GaleraRestore CRs, execute restore from PVCs (order 00), clean up<br>2. Remove `deployment-stage` annotation → CtlPlane reconciles and starts all services<br>RabbitMQ credentials restored automatically (default-user secret labeled by infra-operator, reused by RabbitMQ controller) |
 | 60 | DataPlaneNodeSet | **Data Plane**: Node set definitions (needs Reservations from order 30 and IPSets from order 40) |
 
 **Notes:**
 - **Orders 00-40**: Pure OADP restore (automated via label selectors)
-- **Order 50**: Requires manual steps or controller automation (database restore, RabbitMQ credentials, resume deployment)
+- **Order 50**: Requires manual steps or controller automation (database restore, resume deployment)
 - **Gaps of 10**: Allows easy insertion of new resources (e.g., order 25 between 20 and 30) without renumbering
-- **Staged Deployment**: CtlPlane restored with `deployment-stage: infrastructure-only` annotation in order 30, annotation removed in order 50 after database/RabbitMQ restore
-- **RabbitMQ Restore Process**:
-  - Order 10: Backed-up secrets restored (including `*-default-user` with old passwords)
-  - Order 40: User-created RabbitMQUser CRs restored (no ownerReferences)
-  - Order 50 (manual): Create NEW `-restored-user` secrets with old passwords + NEW RabbitMQUser CRs (operator-managed clusters get original credentials)
+- **Staged Deployment**: CtlPlane restored with `deployment-stage: infrastructure-only` annotation in order 30, annotation removed in order 50 after database restore
+- **RabbitMQ**: Credentials restored automatically — infra-operator labels the `default-user` secret for restore (order 10), and the RabbitMQ controller reuses existing credentials when creating the new cluster
 - **Customization**: All restore orders can be overridden via annotations on individual resources (see [Customizing Restore Order](#customizing-restore-order-for-core-resources))
 
 ### Restore Workflow with Staged Deployment
@@ -725,7 +722,6 @@ flowchart TD
 
     subgraph Order50["Order 50: Manual Restore Steps"]
         RestoreDB[Database Restore<br/>Create GaleraRestore CRs,<br/>execute restore from dump PVCs]
-        --> RestoreRabbitMQ[RabbitMQ Credentials<br/>Restore default-user secrets,<br/>create RabbitMQUser CRs]
         --> Resume[Resume Deployment<br/>Remove deployment-stage annotation]
     end
 
@@ -752,7 +748,6 @@ style RestorePVC fill:#E1F5FE
     style RestoreDP fill:#E1F5FE
     style RestorePreReq fill:#FFE4B5
     style RestoreDB fill:#FFE4B5
-    style RestoreRabbitMQ fill:#FFE4B5
     style Resume fill:#FFE4B5
     style EDPMDeploy fill:#FFE4B5
     style EnableIHA fill:#FFE4B5
@@ -766,7 +761,7 @@ style RestorePVC fill:#E1F5FE
 > **Legend:** Light blue = OADP Velero Restore · Light orange = Manual Step · Blue = Wait Condition · Green = Ready Status
 
 **Key Points:**
-- **Staged Deployment**: ControlPlane restored with `deployment-stage: infrastructure-only` annotation in order 30, removed in order 50 after database/RabbitMQ restore
+- **Staged Deployment**: ControlPlane restored with `deployment-stage: infrastructure-only` annotation in order 30, removed in order 50 after database restore
 - **Services Start Clean**: Keystone, Nova, etc. start with already-restored databases and PVCs
 - **EDPM Deployment**: Required after restore to resync all credentials and certificates on dataplane nodes
 - **InstanceHa**: Restored with `spec.disabled: True` to prevent fencing during restore; re-enabled manually after verification
@@ -806,10 +801,10 @@ oc get crd -l backup.openstack.org/restore=true
 | Reservation | true | dataplane | 30 | IP reservations (requires NetConfig) |
 | IPSet | true | dataplane | 40 | IP address sets (requires Reservation) |
 | InstanceHa | true | controlplane | 20 | **Restored with `spec.disabled: True`** via resource modifier to prevent fencing. Operator re-enables after verifying EDPM connectivity. |
-| RabbitMQUser* | true | controlplane | 40 | User-created only (no ownerReferences) |
-| RabbitMQVhost* | true | controlplane | 40 | User-created only (no ownerReferences) |
+| RabbitMQUser | true | controlplane | 40 | User-created only (no ownerReferences) |
+| RabbitMQVhost | true | controlplane | 40 | User-created only (no ownerReferences) |
 
-*User-created resources only. Operator-managed RabbitMQUser CRs are recreated in order 50 (manual/controller) with original credentials.
+RabbitMQ default-user credentials are restored automatically — the infra-operator labels the secret for restore (order 10), and the RabbitMQ controller reuses existing credentials.
 
 ### MariaDB Operator CRDs
 
@@ -1054,7 +1049,7 @@ Categories enable selective backup/restore scenarios. The design uses **two cate
 **controlplane:**
 - OpenStackControlPlane CR
 - GaleraBackup
-- RabbitMQUser, RabbitMQVhost
+- RabbitMQ default-user credentials (labeled by infra-operator)
 - Custom Issuers (labeled by ControlPlane controller), InstanceHa
 - **All user-provided Secrets and ConfigMaps** (CA certs, passwords, SSH keys, EDPM configs)
 - PVCs for services
@@ -1127,7 +1122,7 @@ Use cases:
 - ci-framework `cifmw_backup_restore` role orchestrates the full restore flow:
   - Ordered OADP restores (00 → 10 → 20 → 30 → 40 → 60)
   - Automated database restore (GaleraRestore CRs + restore script)
-  - RabbitMQ credential restore (secrets from backup + RabbitMQUser CRs)
+  - RabbitMQ credentials restored automatically (default-user secret labeled by infra-operator)
   - Staged deployment (infrastructure-only → full)
   - EDPM deployment to resync credentials
 - Manual procedure documented in [`restore/README.md`](restore/README.md)
@@ -1235,8 +1230,7 @@ stringData:
 #### OpenStackRestore Controller
 
 Orchestrates the full restore sequence using the same template-based approach,
-plus built-in stages for database restore, RabbitMQ credential restore, and
-staged deployment lifecycle.
+plus built-in stages for database restore and staged deployment lifecycle.
 
 ```yaml
 apiVersion: backup.openstack.org/v1beta1
@@ -1249,7 +1243,6 @@ spec:
   templateRef:
     name: openstack-restore-templates   # Secret with all restore stage templates
   automatedDatabaseRestore: true
-  automatedRabbitMQRestore: true
 status:
   phase: InProgress  # Pending, InProgress, Completed, Failed
   currentStage: order-20-infra
@@ -1327,7 +1320,7 @@ from a CR spec). Without a `schedule` field, the CR triggers a one-shot backup.
 - **Single Secret per workflow**: All stage templates in one Secret, referenced
   by key (`templateRef.name` + `templateRef.key`)
 - **Built-in stages**: `GaleraBackup` (trigger DB dump jobs), `GaleraRestore`
-  (create restore CRs, exec restore), `RabbitMQRestore` (credential restore)
+  (create restore CRs, exec restore)
   are built-in since they use our own CRDs
 - **Template variables**: Controller provides `.Namespace`, `.Timestamp`,
   `.OADPNamespace`, `.BackupName`, etc. for template rendering

@@ -91,7 +91,7 @@ const (
     RestoreOrder20 = "20" // Infrastructure - Issuers, NetConfig, Topology, BGPConfiguration, DNSData, OpenStackVersion, OpenStackBackupConfig
     RestoreOrder30 = "30" // CtlPlane + networking - OpenStackControlPlane, Reservation
     RestoreOrder40 = "40" // Backup config, IP sets, DataPlane services - GaleraBackup, IPSet, DataPlaneService
-    RestoreOrder50 = "50" // Manual steps - database/RabbitMQ restore, resume deployment
+    RestoreOrder50 = "50" // Manual steps - database restore, resume deployment
     RestoreOrder60 = "60" // DataPlane - DataPlaneNodeSet
 )
 
@@ -361,7 +361,7 @@ We use two separate OADP backups:
 | 20 | OpenStackVersion, OpenStackBackupConfig, Issuers, NetConfig, Topology, BGPConfiguration, DNSData, InstanceHa | OADP Restore CR | Infrastructure base (InstanceHa restored with `spec.disabled: True`) |
 | 30 | OpenStackControlPlane, Reservation | OADP Restore CR | With `deployment-stage: infrastructure-only` annotation |
 | 40 | GaleraBackup, IPSet, DataPlaneService | OADP Restore CR | Backup config, IP sets, custom DataPlane services |
-| 50 | Database + RabbitMQ restore | **Manual/Playbook** | GaleraRestore CRs, RabbitMQ credential restore, remove staged annotation |
+| 50 | Database restore, resume deployment | **Manual/Playbook** | GaleraRestore CRs, remove staged annotation. RabbitMQ credentials restored automatically via default-user secret. |
 | 60 | DataPlaneNodeSet | OADP Restore CR | DataPlane resources (optional) |
 
 ### Restore CRs
@@ -391,17 +391,12 @@ spec:
     name: openstack-restore-resource-modifiers
 ```
 
-### RabbitMQ Credential Restore (Order 50)
+### RabbitMQ Credentials
 
-RabbitMQ clusters generate new random credentials on creation, but EDPM nodes still use the original ones. The restore process:
-
-1. Restore all secrets from backup to a temporary namespace (`openstack-restore-tmp`) using Velero `namespaceMapping`
-2. Strip finalizers from restored secrets (via resource modifier ConfigMap)
-3. Copy `*-default-user` secrets as `*-restored-user` to the target namespace
-4. Create RabbitMQUser CRs to import the old credentials
-5. Clean up the temporary namespace
-
-See [`restore/06c-manual-rabbitmq-restore.md`](restore/06c-manual-rabbitmq-restore.md) for the manual procedure or the ci-framework `cifmw_backup_restore` role for automation.
+RabbitMQ credentials are restored automatically. The infra-operator's RabbitMQ
+controller labels the `default-user` secret for restore (order 10). On restore,
+the secret is restored before the RabbitMQ cluster is created, and the controller
+reuses the existing credentials instead of generating new ones.
 
 ### Automated Restore
 
