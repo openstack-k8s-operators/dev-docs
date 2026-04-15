@@ -49,6 +49,7 @@ To disable: `-e cifmw_backup_restore_snapshot_move_data=false`.
 
 | Path | Description |
 |------|-------------|
+| [`user-guide.md`](user-guide.md) | **User guide**: Complete backup and restore procedure (no Ansible) |
 | [`minio/`](minio/) | MinIO deployment (S3-compatible storage for OADP) |
 | [`oadp/`](oadp/) | OADP operator installation and configuration |
 | [`backup/`](backup/) | OADP Backup CR reference |
