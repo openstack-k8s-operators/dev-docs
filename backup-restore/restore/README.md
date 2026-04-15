@@ -19,7 +19,6 @@ before starting the next.
 | 30 | OpenStackControlPlane, Reservation | **Restored with `deployment-stage: infrastructure-only` annotation** |
 | 40 | GaleraBackup, IPSet, DataPlaneService | Backup config, IP sets, custom DataPlane services |
 | 50 | **Manual**: Database restore | Create GaleraRestore CRs, restore databases, remove deployment-stage annotation |
-| 55 | **Manual**: RabbitMQ credentials | Restore old secrets from backup, create RabbitMQUser CRs |
 | 60 | OpenStackDataPlaneNodeSet | DataPlane resources (optional) |
 | - | OpenStackDataPlaneDeployment | Resync credentials on dataplane nodes |
 | - | **Manual** | Re-enable InstanceHa (`spec.disabled: False`) after verifying the cloud is operational |
@@ -82,7 +81,6 @@ The playbook runs all restore steps in order, including:
 - Ordered OADP restores (PVCs > Foundation > Infrastructure > ControlPlane > GaleraBackup)
 - Waits for infrastructure to be ready (Galera, OVN, RabbitMQ)
 - Automated database restore (creates GaleraRestore CRs, runs restore script)
-- RabbitMQ credential restore (restores old secrets from backup, creates RabbitMQUser CRs)
 - Removes deployment-stage annotation to resume full deployment
 - Waits for control plane to be ready
 - Optional DataPlane restore
@@ -333,20 +331,9 @@ Summary:
 3. Execute `restore_galera` inside each pod
 4. Delete GaleraRestore CRs
 
-#### Step 6b: RabbitMQ Credential Restore
+#### Step 6b: Remove deployment-stage Annotation
 
-Follow the detailed procedure in
-[06c-manual-rabbitmq-restore.md](06c-manual-rabbitmq-restore.md).
-
-Summary:
-1. Restore secrets to a temporary namespace
-2. Copy old `*-default-user` credentials to target namespace
-3. Create RabbitMQUser CRs
-4. Delete temporary namespace
-
-#### Step 6c: Remove deployment-stage Annotation
-
-After database and RabbitMQ credentials are restored, remove the
+After database restore is complete, remove the
 `deployment-stage` annotation to resume full OpenStack deployment.
 **This is critical** — without it, services remain in infrastructure-only
 mode and will not start.
@@ -567,5 +554,4 @@ oc logs <backup-source>-restore-<restore-name> -n openstack
 
 - Backup: [`../backup/README.md`](../backup/README.md)
 - Manual database restore: [`06-manual-database-restore.md`](06-manual-database-restore.md)
-- Manual RabbitMQ restore: [`06c-manual-rabbitmq-restore.md`](06c-manual-rabbitmq-restore.md)
 - Design document: [`../backup-restore-controller-design.md`](../backup-restore-controller-design.md)
