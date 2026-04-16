@@ -579,7 +579,21 @@ EOF
 fi
 ```
 
-### Step 11: Re-enable InstanceHa (optional)
+### Step 11: Sync Neutron state to OVN database
+
+Run after the EDPM deployment so all compute nodes' `ovn-controller`
+are reconnected to the new OVN SB DB with their chassis registered.
+
+```bash
+oc exec -n openstack \
+  $(oc get pod -n openstack -l service=neutron -o jsonpath='{.items[0].metadata.name}') \
+  -c neutron-api -- neutron-ovn-db-sync-util \
+  --config-file /etc/neutron/neutron.conf \
+  --config-file /etc/neutron/plugins/ml2/ml2_conf.ini \
+  --ovn-neutron_sync_mode repair
+```
+
+### Step 12: Re-enable InstanceHa (optional)
 
 Only required if InstanceHa was used in the backed-up environment.
 After verifying the restored cloud is fully operational (see [Verification](#verification)):
@@ -608,7 +622,7 @@ oc exec -t openstackclient -n openstack -- openstack compute service list
 # Verify network agents are up
 oc exec -t openstackclient -n openstack -- openstack network agent list
 
-# All resources labeled for restore
+# All resources labeled for restore (Secrets, ConfigMaps, NADs, CRs — everything)
 oc get $(oc api-resources --verbs=list -o name | paste -sd, -) \
   -l backup.openstack.org/restore=true -n openstack 2>/dev/null
 ```
@@ -677,8 +691,15 @@ oc annotate secret custom-ca-cert -n openstack \
 
 - **Operator version must match** between source and target clusters
 - **Namespace change not supported** — restore to the same namespace name
-- **OVN database** is reconstructed by Neutron from the restored database
-  (brief network disruption during reconciliation)
+- **VM network connectivity** is interrupted when the EDPM nodes'
+  `ovn-controller` reconnects to the new (empty) OVN SB database during the
+  EDPM deployment. The OVN databases are fresh after restore and the compute
+  nodes' cached flows are wiped when `ovn-controller` connects to the empty
+  SB DB. Connectivity is restored when `neutron-ovn-db-sync-util` runs
+  after the EDPM deployment (Step 11), repopulating the OVN NB/SB DB from
+  Neutron's MariaDB. The duration of the break depends on the number of
+  compute nodes and network objects. VMs continue running — only network
+  connectivity is affected during this window.
 - **RabbitMQ** is recreated as a fresh cluster with restored credentials
   (in-flight messages are lost)
 - **Running VM state** reflects the backup point in time
