@@ -257,11 +257,13 @@ Ensure the target namespace is clean — no stale PVCs or resources from a
 previous deployment. Follow the official cleanup procedure:
 [Removing RHOSO resources from the RHOCP environment](https://docs.redhat.com/en/documentation/red_hat_openstack_services_on_openshift/18.0/html/maintaining_the_red_hat_openstack_services_on_openshift_deployment/assembly_removing-rhoso-deployment-from-rhocp-environment#proc_removing-RHOSO-resources-from-RHOCP-environment_clean)
 
-### Step 0: Create Resource Modifier ConfigMap
+### Step 0: Create OADP Resource Modifier ConfigMap
 
-This ConfigMap is referenced by all Restore CRs. It strips ownerReferences
-and annotations, adds staged deployment to the ControlPlane, and disables
-InstanceHa during restore.
+Create a Velero Resource Modifier ConfigMap in the OADP namespace
+(`openshift-adp`). This is an OADP/Velero feature that modifies resources
+during restore. The ConfigMap is referenced by all Restore CRs via
+`spec.resourceModifier`. It strips ownerReferences and annotations, adds
+staged deployment to the ControlPlane, and disables InstanceHa during restore.
 
 ```bash
 cat <<'EOF' | oc apply -f -
