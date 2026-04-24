@@ -433,7 +433,7 @@ Wait for the ControlPlane to become ready in infrastructure-only mode
 
 ```bash
 oc wait openstackcontrolplane -n openstack --all \
-  --for=condition=Ready --timeout=15m
+  --for=condition=OpenStackControlPlaneInfrastructureReady --timeout=15m
 ```
 
 ### Step 6: Restore GaleraBackup, IPSet, DataPlaneService
@@ -478,7 +478,7 @@ metadata:
   name: openstackrestore
   namespace: openstack
 spec:
-  galeraBackupName: openstack
+  backupSource: openstack
 EOF
 
 # Create GaleraRestore for additional cells (if multi-cell)
@@ -490,25 +490,24 @@ EOF
 #   name: openstackrestorecell1
 #   namespace: openstack
 # spec:
-#   galeraBackupName: openstack-cell1
+#   backupSource: openstack-cell1
 # EOF
 ```
 
-Wait for restore pods to be ready, then execute the restore:
+Wait for restore pod to be ready, then execute the restore.
+The pod name follows the pattern `{galera-instance}-restore-{restore-cr-name}`:
 
 ```bash
 # Wait for restore pod
-oc wait pod -n openstack -l app=galera,galerabackup=openstack \
+oc wait pod/openstack-restore-openstackrestore -n openstack \
   --for=condition=Ready --timeout=5m
 
 # Execute restore (use --content data to restore only data, not grants)
-RESTORE_POD=$(oc get pod -n openstack -l app=galera,galerabackup=openstack \
-  -o jsonpath='{.items[0].metadata.name}')
-oc exec -n openstack ${RESTORE_POD} -- /bin/bash -c \
-  'cd /backup && bash restore_galera --content data'
+oc exec -n openstack openstack-restore-openstackrestore -- \
+  /var/lib/backup-scripts/restore_galera --yes --content data "/backup/data/*_${BACKUP_TS}.sql.gz"
 ```
 
-Repeat for additional cells if needed.
+Repeat for additional cells if needed (e.g. `openstack-cell1-restore-openstackrestorecell1`).
 
 Clean up GaleraRestore CRs:
 
