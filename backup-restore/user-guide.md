@@ -133,7 +133,41 @@ done
 oc -n openstack wait --for=condition=complete job -l app=galera --timeout=10m
 ```
 
-### Step 3: OADP PVC Backup
+### Step 3: OVN Database Backup (optional)
+
+Back up the OVN Northbound and Southbound databases using `ovsdb-client backup`.
+The backup files are written to the OVN PVCs, which are captured by the OADP PVC
+backup in the next step. If you skip this step, see
+Step 12 (Sync Neutron to OVN).
+
+OVN DB PVCs are not labeled for backup by default. Label them first:
+
+```bash
+oc label pvc -n openstack -l service=ovsdbserver-nb \
+  backup.openstack.org/backup=true \
+  backup.openstack.org/restore=true \
+  backup.openstack.org/restore-order=00 \
+  backup.openstack.org/category=controlplane
+oc label pvc -n openstack -l service=ovsdbserver-sb \
+  backup.openstack.org/backup=true \
+  backup.openstack.org/restore=true \
+  backup.openstack.org/restore-order=00 \
+  backup.openstack.org/category=controlplane
+```
+
+Then trigger the OVN database backups:
+
+```bash
+oc exec ovsdbserver-nb-0 -n openstack -- bash -c \
+  "ovsdb-client backup unix:/etc/ovn/ovnnb_db.sock OVN_Northbound \
+    > /etc/ovn/ovnnb_db.db.${BACKUP_TS}"
+
+oc exec ovsdbserver-sb-0 -n openstack -- bash -c \
+  "ovsdb-client backup unix:/etc/ovn/ovnsb_db.sock OVN_Southbound \
+    > /etc/ovn/ovnsb_db.db.${BACKUP_TS}"
+```
+
+### Step 4: OADP PVC Backup
 
 ```bash
 cat <<EOF | oc apply -f -
@@ -173,7 +207,7 @@ oc wait --for=jsonpath='{.status.phase}'=Completed \
   [OADP documentation](https://docs.redhat.com/en/documentation/openshift_container_platform/4.20/html/backup_and_restore/oadp-application-backup-and-restore)
   for storage-specific configuration.
 
-### Step 4: OADP Resources Backup
+### Step 5: OADP Resources Backup
 
 ```bash
 cat <<EOF | oc apply -f -
@@ -200,7 +234,7 @@ oc wait --for=jsonpath='{.status.phase}'=Completed \
   backup/openstack-backup-resources-${BACKUP_TS} -n openshift-adp --timeout=30m
 ```
 
-### Step 5: Verify Backup
+### Step 6: Verify Backup
 
 ```bash
 # Check backup status
@@ -291,7 +325,7 @@ data:
               kubectl.kubernetes.io/last-applied-configuration: null
     # Rule 2: OpenStackControlPlane — add staged deployment annotation so
     # only infrastructure services (Galera, OVN, RabbitMQ, Memcached) start.
-    # Databases are restored before removing the annotation in Step 8.
+    # Databases are restored before removing the annotation in Step 9.
     - conditions:
         groupResource: openstackcontrolplanes.core.openstack.org
         namespaces:
@@ -325,7 +359,7 @@ metadata:
   name: openstack-restore-00-pvcs-${RESTORE_SUFFIX}
   namespace: openshift-adp
 spec:
-  backupName: ${PVC_BACKUP}                          # PVC backup from Step 3
+  backupName: ${PVC_BACKUP}                          # PVC backup from Step 4
   includedNamespaces:
   - openstack
   excludedResources:
@@ -351,7 +385,7 @@ metadata:
   name: openstack-restore-10-foundation-${RESTORE_SUFFIX}
   namespace: openshift-adp
 spec:
-  backupName: ${RESOURCES_BACKUP}                    # Resources backup from Step 4
+  backupName: ${RESOURCES_BACKUP}                    # Resources backup from Step 5
   includedNamespaces:
   - openstack
   labelSelector:                                     # Only restore resources labeled for
@@ -462,7 +496,7 @@ oc wait --for=jsonpath='{.status.phase}'=Completed \
   restore/openstack-restore-40-backup-${RESTORE_SUFFIX} -n openshift-adp --timeout=5m
 ```
 
-### Step 7: Database Restore
+### Step 7: Service Database Restore
 
 Create GaleraRestore CRs for each Galera instance:
 
@@ -515,7 +549,45 @@ Clean up GaleraRestore CRs:
 oc delete galerarestore --all -n openstack
 ```
 
-### Step 8: Resume Full Deployment
+### Step 8: OVN Database Restore (optional — only if Step 3 was performed)
+
+Restore the OVN NB and SB databases from the backup files taken in Step 3.
+The backup files are already on the restored PVCs from Step 1. Replace the
+database on replica-0 with the backup, delete the database files on replicas
+1 and 2 (they contain stale raft membership from the original cluster), then
+force delete all OVN pods to restart with the restored data. On restart,
+replica-0 bootstraps a new raft cluster from the standalone backup and
+replicas 1+2 join automatically.
+
+```bash
+REPLICAS=3
+
+# Replace the active DB with the backup on replica-0, delete on replicas 1+
+for db in nb sb; do
+  oc exec ovsdbserver-${db}-0 -n openstack -c ovsdbserver-${db} -- bash -c \
+    "rm /etc/ovn/ovn${db}_db.db && \
+     cp /etc/ovn/ovn${db}_db.db.${BACKUP_TS} /etc/ovn/ovn${db}_db.db"
+
+  for ((i=1; i<${REPLICAS}; i++)); do
+    oc exec ovsdbserver-${db}-${i} -n openstack -c ovsdbserver-${db} -- \
+      rm -f /etc/ovn/ovn${db}_db.db
+  done
+done
+
+# Force delete all OVN DB pods to restart with the restored database
+oc delete pod -n openstack -l service=ovsdbserver-nb --force --grace-period=0
+oc delete pod -n openstack -l service=ovsdbserver-sb --force --grace-period=0
+oc wait pod -n openstack -l service=ovsdbserver-nb --for=condition=Ready --timeout=5m
+oc wait pod -n openstack -l service=ovsdbserver-sb --for=condition=Ready --timeout=5m
+
+# Restart OVN control plane pods to reconnect to the restored databases
+oc delete pod -n openstack -l service=ovn-northd
+oc delete pod -n openstack -l service=ovn-controller
+oc delete pod -n openstack -l service=ovn-controller-ovs
+oc delete pod -n openstack -l service=ovn-controller-metrics
+```
+
+### Step 9: Resume Full Deployment
 
 Remove the `deployment-stage` annotation to start all OpenStack services:
 
@@ -533,7 +605,7 @@ oc wait openstackcontrolplane -n openstack --all \
   --for=condition=Ready --timeout=30m
 ```
 
-### Step 9: Restore DataPlane
+### Step 10: Restore DataPlane
 
 ```bash
 cat <<EOF | oc apply -f -
@@ -559,7 +631,7 @@ oc wait --for=jsonpath='{.status.phase}'=Completed \
   restore/openstack-restore-60-dataplane-${RESTORE_SUFFIX} -n openshift-adp --timeout=5m
 ```
 
-### Step 10: EDPM Deployment
+### Step 11: EDPM Deployment
 
 Resync deployment/configuration state from restored backup on dataplane nodes:
 
@@ -580,21 +652,42 @@ EOF
 fi
 ```
 
-### Step 11: Sync Neutron state to OVN database
+### Step 12: Verify and Sync Neutron to OVN
 
-Run after the EDPM deployment so all compute nodes' `ovn-controller`
-are reconnected to the new OVN SB DB with their chassis registered.
+If OVN database backups were not taken (Steps 3 and 8 skipped), the OVN
+databases are empty after restore. The EDPM deployment reconnects
+`ovn-controller` to the empty SB database, wiping cached OVS datapath flows
+and breaking VM network connectivity. Run `neutron-ovn-db-sync-util` in
+`repair` mode to repopulate the OVN NB/SB databases from Neutron's MariaDB
+and restore connectivity.
+
+Even if OVN DB backups were restored (Step 8), run the sync in `log` mode
+first to check for any drift between the Neutron and OVN databases:
 
 ```bash
-oc exec -n openstack \
-  $(oc get pod -n openstack -l service=neutron -o jsonpath='{.items[0].metadata.name}') \
-  -c neutron-api -- neutron-ovn-db-sync-util \
+# Check for inconsistencies (log mode — read-only)
+oc rsh -n openstack -c neutron-api deploy/neutron \
+  neutron-ovn-db-sync-util \
+  --config-file /usr/share/neutron/neutron-dist.conf \
   --config-file /etc/neutron/neutron.conf \
-  --config-file /etc/neutron/plugins/ml2/ml2_conf.ini \
-  --ovn-neutron_sync_mode repair
+  --config-dir /etc/neutron/neutron.conf.d \
+  --ovn-neutron_sync_mode=log --debug
 ```
 
-### Step 12: Re-enable InstanceHa (optional)
+If inconsistencies are found (or if Step 3 was skipped), run in `repair`
+mode:
+
+```bash
+# Fix inconsistencies (repair mode)
+oc rsh -n openstack -c neutron-api deploy/neutron \
+  neutron-ovn-db-sync-util \
+  --config-file /usr/share/neutron/neutron-dist.conf \
+  --config-file /etc/neutron/neutron.conf \
+  --config-dir /etc/neutron/neutron.conf.d \
+  --ovn-neutron_sync_mode=repair --debug
+```
+
+### Step 13: Re-enable InstanceHa (optional)
 
 Only required if InstanceHa was used in the backed-up environment.
 After verifying the restored cloud is fully operational (see [Verification](#verification)):
@@ -692,17 +785,19 @@ oc annotate secret custom-ca-cert -n openstack \
 
 - **Operator version must match** between source and target clusters
 - **Namespace change not supported** — restore to the same namespace name
-- **VM network connectivity** is interrupted when the EDPM nodes'
-  `ovn-controller` reconnects to the new (empty) OVN SB database during the
-  EDPM deployment. The OVN databases are fresh after restore and the compute
-  nodes' cached flows are wiped when `ovn-controller` connects to the empty
-  SB DB. Connectivity is restored when `neutron-ovn-db-sync-util` runs
-  after the EDPM deployment (Step 11), repopulating the OVN NB/SB DB from
-  Neutron's MariaDB. The duration of the break depends on the number of
-  compute nodes and network objects. VMs continue running — only network
-  connectivity is affected during this window.
+- **OVN DB backup is optional** and requires manually labeling the OVN PVCs
+  for backup and running `ovsdb-client backup` (Step 3) before the OADP PVC
+  backup. If skipped, the OVN databases will be empty after restore — see
+  Step 12 (Sync Neutron to OVN).
+- **VM network connectivity** may be interrupted during restore. Without
+  OVN DB backup (Step 3 skipped), connectivity is lost when `ovn-controller`
+  reconnects to the empty SB database and is restored by
+  `neutron-ovn-db-sync-util` (Step 12).
 - **RabbitMQ** is recreated as a fresh cluster with restored credentials
   (in-flight messages are lost)
-- **Running VM state** reflects the backup point in time
+- **Running VM state** reflects the backup point in time. If VMs were
+  migrated after the backup, Nova's database will not match the actual
+  placement.
 - **Fully updated environments only** — backup/restore is not supported for
   partial update states
+
