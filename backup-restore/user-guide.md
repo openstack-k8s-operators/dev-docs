@@ -549,9 +549,9 @@ Clean up GaleraRestore CRs:
 oc delete galerarestore --all -n openstack
 ```
 
-### Step 8: OVN Database Restore (optional — only if Step 3 was performed)
+### Step 8: OVN Database Restore (optional — only if Backup Step 3 was performed)
 
-Restore the OVN NB and SB databases from the backup files taken in Step 3.
+Restore the OVN NB and SB databases from the files taken in Backup Step 3.
 The backup files are already on the restored PVCs from Step 1. Replace the
 database on replica-0 with the backup, delete the database files on replicas
 1 and 2 (they contain stale raft membership from the original cluster), then
@@ -654,7 +654,7 @@ fi
 
 ### Step 12: Verify and Sync Neutron to OVN
 
-If OVN database backups were not taken (Steps 3 and 8 skipped), the OVN
+If OVN database backups were not taken (Backup Steps 3 and 8 skipped), the OVN
 databases are empty after restore. The EDPM deployment reconnects
 `ovn-controller` to the empty SB database, wiping cached OVS datapath flows
 and breaking VM network connectivity. Run `neutron-ovn-db-sync-util` in
@@ -674,7 +674,7 @@ oc rsh -n openstack -c neutron-api deploy/neutron \
   --ovn-neutron_sync_mode=log --debug
 ```
 
-If inconsistencies are found (or if Step 3 was skipped), run in `repair`
+If inconsistencies are found (or if Backup Step 3 was skipped), run in `repair`
 mode:
 
 ```bash
