@@ -18,30 +18,34 @@ Three layers of operators are involved:
 ┌─────────────────────────────────────────────────────┐
 │  openstack-operator                                 │
 │  - Owns KeystoneApplicationCredential CRs           │
-│  - Creates/patches AC CRs                           │
+│  - Creates/patches AC CRs (incl. EDPM annotation)   │
 │  - Reads Status.SecretName from AC CR               │
-│  - Sets ApplicationCredentialSecret on service CRs  │
+│  - Sets spec.auth.applicationCredentialSecret on    │
+│    service CR templates                             │
 └──────────────────────────┬──────────────────────────┘
                            │ creates AC CR
                            ▼
 ┌─────────────────────────────────────────────────────┐
 │  keystone-operator                                  │
-│  - Reconciles KeystoneApplicationCredential CRs     │
-│  - Creates AC in Keystone (API call)                │
-│  - Creates K8s Secret with AC_ID and AC_SECRET      │
-│  - Manages rotation                                 │
-│  - Sets Status on AC CRs                            │
+│  - Creates/rotates ACs in Keystone                  │
+│  - Creates immutable Secrets                        │
+│  - Protection finalizer on Secrets                  │
+│  - Revokes unused ACs; deletes old Secrets when safe│
+│  - Gates cleanup/delete on EDPM NodeSet hash sync   │
 └──────────────────────────┬──────────────────────────┘
                            │ AC secret name flows to service CR
                            ▼
 ┌─────────────────────────────────────────────────────┐
 │  service operators                                  │
-│  - Watch the named AC secret via field indexer      │
-│  - Read AC_ID and AC_SECRET from the secret         │
-│  - Generate service config with auth_type =         │
-│    v3applicationcredential                          │
+│  - Watch spec.auth.applicationCredentialSecret      │
+│  - Add *-ac-consumer finalizer on consumed Secret   │
+│  - Track status.applicationCredentialSecret for     │
+│    rotation handoff                                 │
+│  - Render config with v3applicationcredential       │
 └─────────────────────────────────────────────────────┘
 ```
+
+Shared helpers live in `keystone-operator/api/v1beta1` (`ManageACSecretFinalizer`, `RemoveACSecretConsumerFinalizer`, `GetACCRName`, `GetServiceNameFromACCR`, `IsEDPMService()`, secret key constants `ACIDSecretKey`/`ACSecretSecretKey`, and `EDPMServiceAnnotation`).
 
 ## Configuration
 
@@ -77,10 +81,11 @@ spec:
 
 ### Special cases
 
-- **Telemetry** has three independent sub-services (Aodh, Ceilometer, CloudKitty), each with its own AC CR and config section (`applicationCredentialAodh`, `applicationCredentialCeilometer`, `applicationCredentialCloudKitty`).
-- **Ironic** creates two AC CRs: one for `ironic` and one for `ironic-inspector`.
-- **Glance** creates a single AC CR shared across all GlanceAPI instances.
-- **EDPM AC consumers** are **Nova** and **Ceilometer**. These services have an additional operational gap because the credentials are deployed to EDPM nodes as static configuration and are not picked up automatically after rotation, so the manual redeployment during grace period window is neccesary.
+- **Placement** lives in `nova-operator` but has its own independent AC CR (`ac-placement`), per-service override (`spec.placement.applicationCredential`), and consumer finalizer (`openstack.org/placementapi-ac-consumer`).
+- **Telemetry** has three independent sub-services (Aodh, Ceilometer, CloudKitty), each with its own AC CR and config section (`applicationCredentialAodh`, `applicationCredentialCeilometer`, `applicationCredentialCloudKitty`). Note that Aodh's AC CR is named `ac-aodh`, but the consuming Kubernetes CR is `Autoscaling`, so the consumer finalizer is `openstack.org/autoscaling-ac-consumer` (not `aodh-ac-consumer`).
+- **Ironic** creates two AC CRs: one for `ironic` and one for `ironic-inspector` (separate consumer finalizers: `openstack.org/ironic-ac-consumer` and `openstack.org/ironic-inspector-ac-consumer`). The parent `Ironic` CR tracks two separate status fields (`status.applicationCredentialSecret` and `status.inspectorApplicationCredentialSecret`).
+- **Glance** creates a single AC CR shared across GlanceAPI instances; each GlanceAPI uses a per-API consumer finalizer name (`openstack.org/glance-<apiName>-<apiType>-ac-consumer`).
+- **EDPM consumers** are **Nova** and **Ceilometer**. Their AC CRs are annotated `keystone.openstack.org/edpm-service: "true"`. Credentials are rendered into config consumed on dataplane nodes; see [EDPM awareness](#edpm-awareness).
 
 ## Workflow
 
@@ -88,15 +93,16 @@ spec:
 
 1. `openstack-operator` reconciles the `OpenStackControlPlane` CR.
 2. For each service with AC enabled, it calls `EnsureApplicationCredentialForService`.
-3. If the service is ready and no AC CR exists, `reconcileApplicationCredential` creates a `KeystoneApplicationCredential` CR (for example, `ac-barbican`) with the merged config. The CR is owned by the `OpenStackControlPlane`.
+3. If the service is ready and no AC CR exists, it creates a `KeystoneApplicationCredential` CR (for example, `ac-heat`) owned by the control plane. It sets the EDPM annotation (`true` for Nova/Ceilometer, `false` for control-plane-only services).
 4. `keystone-operator` reconciles the AC CR:
    - Authenticates as the service user using the password from `osp-secret`.
-   - Creates an Application Credential in Keystone with the specified roles, expiration, and access rules.
-   - Creates a K8s Secret named `<ac-cr-name>-secret` (for example, `ac-barbican-secret`) containing `AC_ID` and `AC_SECRET`.
-   - Sets `Status.SecretName`, `Status.ACID`, and `Status.ExpiresAt` on the AC CR.
-   - Adds a protection finalizer (`openstack.org/ac-secret-protection`) to the Secret.
-5. The `openstack-operator` `Owns` the AC CR, so when `keystone-operator` updates its status (sets Ready, populates `Status.SecretName`), controller-runtime triggers a reconcile of the owning `OpenStackControlPlane`. The `openstack-operator` sees the AC CR is ready, reads `Status.SecretName`, and sets it on the service CR (for example, `barbican.spec.auth.applicationCredentialSecret`).
-6. The service operator (for example, `barbican-operator`) watches the named Secret via a field indexer, reads `AC_ID` and `AC_SECRET`, and generates config with `auth_type = v3applicationcredential`.
+   - Creates an Application Credential in Keystone.
+   - Creates an **immutable** Kubernetes Secret named `ac-<service>-<first5ofACID>-secret` containing `AC_ID` and `AC_SECRET`.
+   - Labels the Secret (`application-credentials`, `application-credential-service`).
+   - Adds `openstack.org/ac-secret-protection` and an owner reference to the AC CR.
+   - Sets `status.secretName`, `status.acID`, `status.expiresAt`, and related timestamps.
+5. The `openstack-operator` `Owns` the AC CR, so when `keystone-operator` updates its status (sets Ready, populates `status.secretName`), controller-runtime triggers a reconcile of the owning `OpenStackControlPlane`. The `openstack-operator` reads `status.secretName` and sets `spec.auth.applicationCredentialSecret` on the service template (for example, Heat).
+6. The service operator watches that Secret, adds its consumer finalizer, renders `v3applicationcredential` config, and records `status.applicationCredentialSecret` when consumption is established.
 
 ### AC Rotation
 
@@ -106,107 +112,141 @@ Rotation is triggered by the `keystone-operator` AC controller during reconcile.
 
 The controller first evaluates `needsRotation()`, which returns true in these cases:
 
-1. **No AC exists yet** — `Status.ACID` is empty (initial creation).
-2. **Security-critical fields changed** — `SecurityHash` (computed from `roles`, `accessRules`, `unrestricted`) differs from the stored hash. This triggers immediate rotation.
-3. **Grace period reached** — `time.Now()` is past `ExpiresAt - GracePeriodDays`.
+1. **No AC exists yet** — `status.acID` is empty (initial creation).
+2. **Security-critical fields changed** — `securityHash` (from `roles`, `accessRules`, `unrestricted`) differs from the stored hash (immediate rotation).
+3. **Grace period reached** — `time.Now()` is after `expiresAt - gracePeriodDays`.
 
-In addition, `reconcileNormal()` performs a Secret existence check:
-4. **AC Secret missing** — if `Status.SecretName` is set but the referenced Secret does not exist, the controller forces rotation.
+Additionally, if `status.secretName` is set but that Secret no longer exists, the controller forces rotation/recreation.
 
-#### Rotation behavior
+#### Rotation behavior (keystone-operator)
 
 On rotation:
 
-- A new AC is created in Keystone with a fresh random suffix in the name.
-- The existing K8s Secret name stays the same (`<ac-cr-name>-secret`) and is updated with the new `AC_ID` and `AC_SECRET`.
-- The old AC in Keystone is **not** revoked, it expires naturally.
-- The Secret content change triggers the service operator to reconcile and regenerate config.
-- When rotating an existing AC (not initial create), the controller emits a Kubernetes event on the `KeystoneApplicationCredential` CR: `ApplicationCredentialRotated`.
+- Creates a **new** AC in Keystone (name includes a random suffix).
+- Creates a **new** immutable Secret with a unique name (for example, `ac-heat-d38dc-secret`).
+- Moves the previous `status.secretName` to `status.previousSecretName` and updates `status.secretName` to the new Secret.
+- Emits `ApplicationCredentialRotated` on the AC CR (not on initial create).
+- Runs `cleanupUnusedRotatedSecrets` for older Secrets (see [Lifecycle and cleanup](#lifecycle-and-cleanup)).
 
-### Manual Rotation and Test Triggers
+#### Propagation (openstack-operator → service operators)
 
-For engineering and testing purposes, the following approaches can be used to trigger rotation or recreation:
+1. `openstack-operator` sees the new `status.secretName` and updates the service CR **spec** (`applicationCredentialSecret`).
+2. The service operator detects the spec change and reconciles toward the new Secret.
 
-#### Supported immediate rotation path
+#### Consumer finalizer handshake (service operators)
 
-Change one of the security-critical fields in the AppCred spec:
+Service operators that implement AC consumer finalizers use a two-phase pattern (parent CR or API CR, depending on the service):
 
-- `roles`
-- `accessRules`
-- `unrestricted`
+1. **Early** — add the service consumer finalizer (for example, `openstack.org/heat-ac-consumer`) to the **new** Secret from spec before or during rollout, so keystone-operator does not revoke it prematurely.
+2. **Late** — after all relevant sub-services report ready with the new credentials, remove the consumer finalizer from the **old** Secret named in `status.applicationCredentialSecret`, then set `status.applicationCredentialSecret` to match spec.
 
-This changes the computed `securityHash` and causes a normal immediate rotation on the next reconcile.
+During rotation, **spec** holds the desired (new) Secret; **status** holds the old Secret that still has the consumer finalizer until handoff completes.
 
-#### Trigger by patching `status.expiresAt`
+Why the split matters: `status.applicationCredentialSecret` is the controller's memory of which secret it is still protecting. Setting `status = spec` immediately would erase the old secret name, and the controller would never know which secret to remove the finalizer from. The status update is always persisted (via `helper.PatchInstance` in `defer`), so the concern is not persistence but **timing** — status must lag behind spec until the old secret is safe to release.
 
-Patching `status.expiresAt` to a timestamp in the past can be used to make the controller consider the credential inside the grace window and perform a normal rotation path on the next reconcile.
+For the non-rotation case (initial adoption, or spec and status already match), `status` is set to match `spec` immediately since there is no old secret to protect.
 
-This differs from deleting the Secret because:
+On service CR deletion, the operator removes consumer finalizers from both `status.applicationCredentialSecret` and `spec.auth.applicationCredentialSecret` (covers a crash between adding a finalizer and updating status).
 
-- the existing Secret object remains present,
-- service operators do not transiently reconcile into `ErrACSecretNotFound`,
-- the rotation proceeds through the standard in-place Secret update path.
+#### End-to-end rotation flow
 
-#### Recovery path by deleting the Secret
+```text
+1. keystone-operator: rotation needed → new AC + new immutable Secret
+2. keystone-operator: status.secretName updated; previousSecretName set
+3. openstack-operator: service spec.applicationCredentialSecret → new Secret
+4. service operator: finalizer on new Secret; deploy with new credentials
+5. service operator: when ready, remove finalizer from old Secret; status ← spec
+6. keystone-operator: cleanupUnusedRotatedSecrets revokes/deletes orphans
+   (skips current, previous, and any Secret with a *-ac-consumer finalizer)
+```
 
-The referenced AC Secret is protected by the `openstack.org/ac-secret-protection` finalizer, so it is not normally removable with a simple delete.
+### Manual rotation and test triggers
 
-If the Secret does become absent (for example, after intentionally removing/bypassing the protection finalizer), `keystone-operator` detects that `Status.SecretName` points to a missing Secret and forces rotation/recreation.
+#### Immediate rotation (spec change)
 
-Because this introduces a window where service operators may reconcile into `ErrACSecretNotFound`, this is better treated as an engineering recovery path than as a normal rotation trigger.
+Change security-critical fields (`roles`, `accessRules`, or `unrestricted`) on the `OpenStackControlPlane` CR (global `applicationCredential` or per-service override). The `openstack-operator` propagates these to the AC CR, the security hash changes, and keystone-operator triggers rotation on the next reconcile. The AC CR itself is owned by `openstack-operator` and should not be patched directly — manual spec changes are reconciled back.
 
-#### Recreate path by deleting the AppCred CR
+#### Trigger via `status.expiresAt`
 
-Deleting the `KeystoneApplicationCredential` CR is a different path.
+Patch `status.expiresAt` into the past so the credential falls inside the grace window:
 
-During delete, `keystone-operator`:
-- removes the Secret protection finalizer,
-- removes its own AppCred CR finalizer,
-- does not revoke the Keystone-side application credential.
+```bash
+oc patch -n openstack keystoneapplicationcredential ac-heat \
+  --type=merge --subresource=status \
+  -p '{"status":{"expiresAt":"2001-05-19T00:00:00Z"}}'
+```
 
-If the service remains enabled, `openstack-operator` recreates the AppCred CR on a later reconcile.
+This uses the normal rotation path (new immutable Secret with a unique name). Unlike deleting the Secret, this approach keeps the existing Secret present, so service operators do not transiently reconcile into `ErrACSecretNotFound`.
 
-This is closer to delete-and-recreate than to a normal in-place rotation.
+#### Recovery: missing Secret
 
-### AC Cleanup
+If the referenced Secret is deleted (only after bypassing finalizer `openstack.org/ac-secret-protection`), keystone-operator detects the missing Secret and recreates credentials. Service operators may transiently hit `ErrACSecretNotFound` until the new Secret exists.
 
-AC CRs are deleted in two scenarios:
+#### Deleting the AppCred CR
 
-1. **AC disabled** — When `applicationCredential.enabled` is set to `false` (globally or per-service), `EnsureApplicationCredentialForService` detects `!isACEnabled` and deletes the AC CR if it exists.
-2. **Service disabled** — When a service is disabled (for example, `spec.barbican.enabled: false`), `CleanupApplicationCredentialForService` unconditionally deletes the AC CR regardless of the AC enabled flag.
+The AC CR is owned by `openstack-operator`. Deleting it while the service remains enabled causes `openstack-operator` to recreate it on the next reconcile. During the recreation window, the service CR spec retains the old secret name (openstack-operator returns without updating the template while the new AC CR is not yet ready), and the old Kubernetes Secret remains present because its consumer finalizer (for example, `openstack.org/heat-ac-consumer`) is still there -- the service operator only removes that finalizer after the new secret is propagated to spec and all sub-services are ready with the new credentials. However, the consumer finalizer only protects the **Kubernetes Secret object**; it does not prevent keystone-operator from revoking the **Keystone-side application credential** during `reconcileDelete` (when AC CR is being deleted). After revocation, the AC_ID/AC_SECRET values in the Secret are no longer valid in Keystone, so services may see authentication errors once their cached Keystone token expires during this window. Once the new AC CR is ready, the new secret propagates to the service CR and triggers a single pod restart.
 
-When the AC CR is deleted, the `keystone-operator`:
+AC CR deletion happens automatically when AC is disabled (globally or per-service) or the service itself is disabled. When `keystone-operator` processes the delete: for EDPM-aware CRs, deletion is deferred until NodeSet secret hashes are in sync; then it **best-effort revokes** Keystone ACs for labeled Secrets, removes protection finalizers, and allows garbage collection.
 
-- Removes the protection finalizer from the Secret.
-- Removes its own finalizer from the CR.
-- Does **not** revoke the AC in Keystone; it expires naturally.
+### Lifecycle and cleanup
 
-Because the Secret is owned by the AC CR (owner reference), it is garbage-collected after the AC CR is deleted and the protection finalizer is removed.
+#### Unused rotated secrets
 
-> **Note:** If immediate Keystone-side cleanup is needed (for example, a suspected credential leak), the AC can be manually deleted from Keystone:
->
-> `openstack application credential delete <AC_ID>`
->
-> Be careful: deleting an AC that is still in use, especially by EDPM, will cause authentication failures.
+`cleanupUnusedRotatedSecrets` lists Secrets for the service (`application-credentials` + `application-credential-service` labels). For each Secret that is **not** `status.secretName`, **not** `status.previousSecretName`, and has **no** `openstack.org/*-ac-consumer` finalizer:
 
-The service falls back to password auth on the next reconcile when `ApplicationCredentialSecret` is cleared.
+- Revokes the AC in Keystone (best-effort)
+- Removes `openstack.org/ac-secret-protection`
+- Deletes the Kubernetes Secret
 
-### How Service Operators Consume ACs
+Secrets still referenced by a service consumer finalizer are never deleted by this path.
 
-Service operators follow a consistent pattern:
+#### Expiration vs Kubernetes finalizers
 
-- **Field indexer** on `.spec.auth.applicationCredentialSecret` allows lookup of which service CRs reference a given Secret.
-- **Secret watch** with `ResourceVersionChangedPredicate` triggers reconciliation when the AC Secret content changes.
-- **Config generation** reads `AC_ID` and `AC_SECRET` from the Secret and renders the service config with `auth_type = v3applicationcredential`.
-- **Two distinct states to distinguish**:
-  - **AC not configured** (`ApplicationCredentialSecret` is empty on the service CR) — the config template renders with `auth_type = password`. This is the normal state when AC is disabled or was never enabled.
-  - **AC Secret missing** (`ApplicationCredentialSecret` is set but the referenced Secret doesn't exist) — the service operator returns `ErrACSecretNotFound` and the reconcile fails. Existing pods continue running with old config until they are restarted.
+Under normal operation, rotation occurs during the grace window well before the current AC expires, and the consumer finalizer handshake ensures old credentials are not cleaned up until all services have switched to the new ones. In the unlikely event that rotation or handoff stalls (for example, keystone-operator is down for an extended period), the AC will still expire in Keystone on its configured schedule. A consumer finalizer only prevents **Kubernetes Secret** cleanup; an expired AC cannot authenticate even if the Secret still exists.
 
-## Control Plane Operations and Observability
+#### AC CR deletion
+
+When the AC CR is deleted (AC disabled or service disabled):
+
+- EDPM-aware CRs wait for `OpenStackDataPlaneNodeSet` secret hash sync (same as cleanup).
+- Keystone revocation is attempted for all AC Secrets for that service (by label).
+- Protection finalizers are removed so owner-reference GC can delete Secrets.
+
+### How service operators consume ACs
+
+- **Field indexer** on `.spec.auth.applicationCredentialSecret` (or service-specific path) for Secret → CR mapping.
+- **Secret watch** (often `ResourceVersionChangedPredicate`) to reconcile on Secret changes.
+- **Config generation** reads `AC_ID` / `AC_SECRET` via `keystonev1.ACIDSecretKey` and `keystonev1.ACSecretSecretKey`.
+- **AC not configured** — empty `applicationCredentialSecret` on the service CR → password auth in templates.
+- **AC Secret missing** — spec set but Secret absent → reconcile error (`ErrACSecretNotFound`); running pods keep prior config until rolled.
+
+#### AC lifecycle ownership patterns
+
+Depending on the operator, AC consumer finalizer management and `status.applicationCredentialSecret` tracking live on different CRs. This affects which CR to inspect during troubleshooting:
+
+| Pattern | Operators |
+|---------|-----------|
+| **Parent CR** (top-level CR manages AC lifecycle) | Heat, Barbican, Nova, Watcher, Ironic, Cinder, Manila |
+| **Sub-CR / API CR** (AC lifecycle on the API sub-CR) | GlanceAPI, NeutronAPI, OctaviaAPI, DesignateAPI, SwiftProxy, PlacementAPI |
+| **Independent CRs** (each is its own top-level CR) | Autoscaling (Aodh), Ceilometer, CloudKitty |
+
+## EDPM awareness
+
+Nova and Ceilometer render AC data into secrets deployed to EDPM dataplane nodes. After control-plane rotation, nodes keep old credentials until the next dataplane deployment updates those secrets.
+
+**Annotation:** `openstack-operator` sets `keystone.openstack.org/edpm-service` on each AC CR (`"true"` for Nova and Ceilometer, `"false"` for control-plane-only services). If the annotation is missing, keystone-operator defaults to EDPM-aware behavior (fail-safe).
+
+**NodeSet hash sync:** Before `cleanupUnusedRotatedSecrets` or AC CR deletion, keystone-operator calls `edpm.AreSecretHashesInSync()` (`lib-common/modules/edpm/unstructured`), comparing each `OpenStackDataPlaneNodeSet` `status.secretHashes` to live secret hashes. If any NodeSet is stale, cleanup and delete are deferred.
+
+**Watch:** The AC controller watches `OpenStackDataPlaneNodeSet` status changes (for example, after EDPM deploy updates hashes) and re-evaluates.
+
+**Operator action:** Monitor `ApplicationCredentialRotated` events and redeploy affected NodeSets during the grace period so dataplane config picks up new credentials before the old AC expires in Keystone.
+
+Control-plane-only services (Heat, Barbican, Cinder on CP, etc.) skip the NodeSet check when `edpm-service: "false"`.
+
+## Control plane operations and observability
 
 ### List Application Credentials
-
-List all AppCred CRs in the control plane namespace:
 
 ```bash
 oc get appcred -n openstack
@@ -215,24 +255,17 @@ oc get appcred -n openstack
 Example output:
 
 ```text
-NAME                  ACID                               SECRETNAME                   LASTROTATED            ROTATIONELIGIBLE       STATUS   MESSAGE
-ac-barbican           d38dc4310fbf4601bbe9f4234eb24114   ac-barbican-secret           2026-03-12T08:23:58Z   2026-03-15T08:23:58Z   True     Setup complete
-ac-ceilometer         0e0e7c8f243c4ce8913fd709d44c0104   ac-ceilometer-secret                                2028-02-29T13:35:06Z   True     Setup complete
-ac-cinder             b8c7fb9d3abc4ce18727a56f870c9a18   ac-cinder-secret                                    2027-03-03T13:04:41Z   True     Setup complete
-ac-glance             da20e5b59d0f4227938046c60857cb62   ac-glance-secret             2026-03-12T08:31:42Z   2027-03-13T08:31:42Z   True     Setup complete
-ac-ironic             ec6bbfb36b8041cbad96f4360a84cd71   ac-ironic-secret                                    2027-03-03T13:04:42Z   True     Setup complete
-ac-ironic-inspector   81aebe21c2b94a2b89caec4b1fe652c1   ac-ironic-inspector-secret                          2027-03-03T13:04:45Z   True     Setup complete
-ac-octavia            0dd0b1b7247743b980d909334a4ea8ad   ac-octavia-secret                                   2027-03-07T09:39:19Z   True     Setup complete
+NAME                  ACID                               SECRETNAME                          LASTROTATED            ROTATIONELIGIBLE       STATUS   MESSAGE
+ac-barbican           d38dc4310fbf4601bbe9f4234eb24114   ac-barbican-d38dc-secret            2026-03-12T08:23:58Z   2026-03-15T08:23:58Z   True     Setup complete
+ac-ceilometer         0e0e7c8f243c4ce8913fd709d44c0104   ac-ceilometer-0e0e7-secret                                 2028-02-29T13:35:06Z   True     Setup complete
+ac-cinder             b8c7fb9d3abc4ce18727a56f870c9a18   ac-cinder-b8c7f-secret                                     2027-03-03T13:04:41Z   True     Setup complete
+ac-glance             da20e5b59d0f4227938046c60857cb62   ac-glance-da20e-secret              2026-03-12T08:31:42Z   2027-03-13T08:31:42Z   True     Setup complete
+ac-ironic             ec6bbfb36b8041cbad96f4360a84cd71   ac-ironic-ec6bb-secret                                     2027-03-03T13:04:42Z   True     Setup complete
+ac-ironic-inspector   81aebe21c2b94a2b89caec4b1fe652c1   ac-ironic-inspector-81aeb-secret                           2027-03-03T13:04:45Z   True     Setup complete
+ac-octavia            0dd0b1b7247743b980d909334a4ea8ad   ac-octavia-0dd0b-secret                                    2027-03-07T09:39:19Z   True     Setup complete
 ```
 
-The main columns are:
-
-- `NAME` — AppCred CR name
-- `ACID` — Keystone Application Credential ID
-- `SECRETNAME` — Kubernetes Secret currently holding `AC_ID` and `AC_SECRET`
-- `LASTROTATED` — last successful rotation time
-- `ROTATIONELIGIBLE` — time when automatic rotation becomes eligible
-- `STATUS` / `MESSAGE` — summarized readiness state
+Secret names follow `ac-<service>-<5-char-id-prefix>-secret`, not a fixed `ac-<service>-secret` suffix.
 
 ### Inspect a single AppCred CR
 
@@ -249,6 +282,8 @@ kind: KeystoneApplicationCredential
 metadata:
   name: ac-barbican
   namespace: openstack
+  annotations:
+    keystone.openstack.org/edpm-service: "false"
   finalizers:
     - openstack.org/applicationcredential
   ownerReferences:
@@ -268,7 +303,8 @@ spec:
   userName: barbican
 status:
   acID: d38dc4310fbf4601bbe9f4234eb24114
-  secretName: ac-barbican-secret
+  secretName: ac-barbican-d38dc-secret
+  previousSecretName: ac-barbican-7b23d-secret
   createdAt: "2026-03-12T08:23:58Z"
   expiresAt: "2026-03-17T08:23:58Z"
   lastRotated: "2026-03-12T08:23:58Z"
@@ -291,22 +327,33 @@ status:
 
 ### Rotation events
 
-On rotation, `keystone-operator` emits a Kubernetes event on the AppCred CR with reason `ApplicationCredentialRotated`.
-
-Examples:
+On rotation, `keystone-operator` emits a Kubernetes event on the AppCred CR with reason `ApplicationCredentialRotated`:
 
 ```bash
 oc get events -n openstack --sort-by=.lastTimestamp | grep ApplicationCredentialRotated
 ```
 
-Output:
-```bash
-8s  Normal  ApplicationCredentialRotated   keystoneapplicationcredential/ac-barbican    ApplicationCredential 'ac-barbican' (user: barbican) rotated - EDPM nodes may need credential updates. Previous expiration: 2001-05-19T00:00:00Z, New expiration: 2026-03-18T08:24:18Z
+Example output:
+
+```text
+8s  Normal  ApplicationCredentialRotated  keystoneapplicationcredential/ac-barbican  Rotated credentials for user barbican. New expiration: 2026-03-18T08:24:18Z, next rotation eligible: 2026-03-16T08:24:18Z (grace period: 2 days). Previous credential expires: 2026-03-17T08:23:58Z
 ```
 
-For EDPM consumers such as **Nova** and **Ceilometer**, these events are particularly important because the rotated credential still needs to be propagated to the data plane through redeployment.
+For EDPM consumers (Nova and Ceilometer), these events are particularly important as a signal to plan `OpenStackDataPlaneNodeSet` redeployment before the previous credential's Keystone expiration.
 
-## Conditions and States
+### List AC secrets for a service
+
+```bash
+oc get secret -n openstack -l application-credential-service=heat
+```
+
+Check consumer finalizers:
+
+```bash
+oc get secret -n openstack ac-heat-d38dc-secret -o jsonpath='{.metadata.finalizers}'
+```
+
+## Conditions and states
 
 The AppCred CR does not expose a dedicated phase/status enum such as `Creating`, `Rotating`, or `Failed`. Instead, it exposes conditions and timestamps.
 
@@ -316,7 +363,7 @@ The main conditions are:
 - `KeystoneAPIReady`
 - `KeystoneApplicationCredentialReady`
 
-Typical interpretations are:
+Typical interpretations:
 
 - **Ready / healthy**
   - `Ready=True`
@@ -338,51 +385,22 @@ Typical interpretations are:
 - **Not reconciled to latest spec yet**
   - compare `metadata.generation` with `status.observedGeneration`
 
+## Limitations and operational notes
 
-## Current Limitations
+1. **EDPM manual redeploy** — Dataplane nodes do not pick up rotated ACs automatically. Nova and Ceilometer require `OpenStackDataPlaneNodeSet` deployment during the grace window. Keystone defers revocation/cleanup while NodeSet hashes are out of sync, but Keystone expiration still applies to credentials in use on stale nodes.
 
-1. **Mutable secrets** — Rotation overwrites the existing Secret in place. If propagation fails mid-rotation, the old credential is gone and there is no rollback path.
+2. **`status.applicationCredentialSecret` on service CRs** — Used for rotation handoff (which old Secret still has a consumer finalizer). It is persisted in etcd during normal operation but is not specially handled for control-plane disaster recovery. Restore without status can skip old-secret cleanup and leave orphaned consumer finalizers (Secrets remain until manually fixed). Delete reconciliation still checks both status and spec.
 
-2. **No service-side finalizers** — Service operators do not add finalizers to the AC Secret. The `keystone-operator` adds its own protection finalizer (`openstack.org/ac-secret-protection`) to prevent accidental deletion, but there is no service-side finalizer to coordinate credential handoff during rotation. On the control plane this is self-healing — if an AC CR or its Secret is deleted, the `openstack-operator` detects the change and recreates it almost immediately. The real gap is that the existing Secret is overwritten in place before the service has confirmed it picked up the new credentials, with no previous version to fall back to.
+3. **Orphaned consumer finalizers** — A stale `*-ac-consumer` finalizer blocks keystone-operator from deleting that Secret. It does not keep the Keystone AC valid past `expires_at`. Operators may remove the finalizer only after confirming nothing still uses that Secret.
 
-3. **No Keystone revocation** — Old ACs are not revoked in Keystone after rotation or CR deletion. They persist until they expire, which can be a long time.
+4. **Manual Keystone cleanup** — For suspected compromise, operators can revoke in Keystone directly:
 
-4. **EDPM gap** — EDPM nodes have AC credentials deployed as static config files via Ansible. There is no watch or reconcile loop on the node — if the AC rotates, EDPM nodes continue using the old credentials silently until a manual `OpenStackDataPlaneNodeSet` deployment is triggered. If the old AC expires in Keystone before the nodes are updated, services on those nodes will start getting authentication errors. This currently applies to **Nova** and **Ceilometer**.
+   ```bash
+   openstack application credential delete <AC_ID>
+   ```
 
-## Future Improvements
+   Do not revoke credentials still in use on EDPM or control plane without coordinating rollout.
 
-The following changes have been agreed upon for the next iteration:
+## Related documentation
 
-#### Immutable Secrets with Unique Names
-
-Each rotation will create a new **immutable** K8s Secret with a unique name that includes the first 5 characters of the Keystone AC ID (for example, `ac-barbican-a1b2c-secret`). The old Secret is preserved until all consumers confirm they have switched to the new credential. This enables safe rollback — if propagation fails, the old Secret and credential remain valid and in use.
-
-#### Finalizer Based Lifecycle
-
-When a service operator starts using an AC Secret, it adds a service-specific finalizer to the Secret. The `keystone-operator` only deletes the old Secret and revokes the old AC in Keystone after all service finalizers have been removed, confirming that every consumer has switched to the new credential.
-
-#### Service Labels on AC Secrets
-
-AC Secrets will get a label identifying the owning service (for example, `app-credential-service: barbican`). This allows easy discovery and cleanup of all AC Secrets for a specific service.
-
-#### Keystone AC Revocation
-
-With the finalizer handshake in place, it becomes safe to revoke old ACs in Keystone after all consumers have confirmed the switch. This closes the credential leakage gap where old ACs persist for a long period of time.
-
-#### EDPM Finalizer Coordination
-
-The `OpenStackDataPlaneNodeSet` controller will add a finalizer to the AC Secret it is currently using. The finalizer is removed only after all nodes have been redeployed with the new Secret. This ensures credentials are not revoked while EDPM nodes are still using them. This work depends on the secret-tracking mechanism from PR [#1781](https://github.com/openstack-k8s-operators/openstack-operator/pull/1781).
-
-#### Target Rotation Flow
-
-```text
-1. keystone-operator detects rotation needed (grace period, security hash change, or missing Secret)
-2. Creates new AC in Keystone and a new immutable Secret with a unique name
-3. Updates AC CR Status.SecretName to point to the new Secret
-4. openstack-operator watches the AC CR (via Owns), sees the new SecretName, and updates the service CR
-5. Service operator watches the named Secret field, picks up the new Secret, and reconfigures
-6. Service operator removes its finalizer from the old Secret
-7. keystone-operator sees the old Secret has no service finalizers, deletes it, and revokes the old AC
-```
-
-For EDPM services, step 6 will require OpenStackDataPlaneNodeSet level tracking of which secret version is deployed on each node. Automatic finalizer removal after all nodes have adopted the new credential depends on the per-node secret tracking work proposed in PR [#1781](https://github.com/openstack-k8s-operators/openstack-operator/pull/1781).
+- [keystone-operator/docs/applicationcredentials.md](https://github.com/openstack-k8s-operators/keystone-operator/blob/main/docs/applicationcredentials.md) — AC controller-focused reference (API fields, controller steps, EDPM tests).
