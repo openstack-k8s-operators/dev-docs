@@ -151,7 +151,7 @@ oc -n openstack wait --for=condition=complete job -l app=galera --timeout=10m
 Back up the OVN Northbound and Southbound databases using `ovsdb-client backup`.
 The backup files are written to the OVN PVCs, which are captured by the OADP PVC
 backup in the next step. If you skip this step, see
-Step 12 (Sync Neutron to OVN).
+Step 10 (Sync Neutron to OVN).
 
 OVN DB PVCs are not labeled for backup by default. Label them first:
 
@@ -290,7 +290,7 @@ this step can be skipped.
 If your BaremetalHosts are in a different namespace, create an additional
 backup for that namespace. During restore, the secrets and configmaps from
 this backup — BaremetalHosts, secrets, and configmaps — are restored in
-Restore Step 10:
+Restore Step 11:
 
 ```bash
 BMH_NAMESPACE=<namespace where BaremetalHosts are located>
@@ -723,7 +723,43 @@ oc wait openstackcontrolplane -n openstack --all \
   --for=condition=Ready --timeout=30m
 ```
 
-### Step 10: Restore BaremetalHosts (optional — baremetal-provisioned nodes only)
+### Step 10: Verify and Sync Neutron to OVN
+
+If OVN database backups were not taken (Backup Steps 3 and 8 skipped), the OVN
+databases are empty after restore. Run `neutron-ovn-db-sync-util` in `repair`
+mode to repopulate the OVN NB/SB databases from Neutron's MariaDB before
+proceeding with the EDPM deployment (Step 14). This prevents data plane
+outage — without this step, `ovn-controller` would reconnect to empty databases
+during the EDPM deployment, wiping cached OVS datapath flows and breaking VM
+network connectivity.
+
+Even if OVN DB backups were restored (Step 8), run the sync in `log` mode
+first to check for any drift between the Neutron and OVN databases:
+
+```bash
+# Check for inconsistencies (log mode — read-only)
+oc rsh -n openstack -c neutron-api deploy/neutron \
+  neutron-ovn-db-sync-util \
+  --config-file /usr/share/neutron/neutron-dist.conf \
+  --config-file /etc/neutron/neutron.conf \
+  --config-dir /etc/neutron/neutron.conf.d \
+  --ovn-neutron_sync_mode=log --debug
+```
+
+If inconsistencies are found (or if Backup Step 3 was skipped), run in `repair`
+mode:
+
+```bash
+# Fix inconsistencies (repair mode)
+oc rsh -n openstack -c neutron-api deploy/neutron \
+  neutron-ovn-db-sync-util \
+  --config-file /usr/share/neutron/neutron-dist.conf \
+  --config-file /etc/neutron/neutron.conf \
+  --config-dir /etc/neutron/neutron.conf.d \
+  --ovn-neutron_sync_mode=repair --debug
+```
+
+### Step 11: Restore BaremetalHosts (optional — baremetal-provisioned nodes only)
 
 Skip this step if all OpenStackDataPlaneNodeSets use `preProvisioned: true`.
 
@@ -819,7 +855,7 @@ oc get bmh -n ${BMH_NAMESPACE}
 
 All BMHs should show `STATE: provisioned` and `ONLINE: true`.
 
-### Step 11: Restore OpenStackBaremetalSets (optional — baremetal-provisioned nodes only)
+### Step 12: Restore OpenStackBaremetalSets (optional — baremetal-provisioned nodes only)
 
 Skip this step if all OpenStackDataPlaneNodeSets use `preProvisioned: true`.
 
@@ -875,7 +911,7 @@ The `OpenStackBaremetalSet` will temporarily leave the `Ready` state while
 the `OpenStackProvisionServer` reconciles, but the associated BMHs remain
 untouched and their workloads are unaffected.
 
-### Step 12: Restore DataPlane
+### Step 13: Restore DataPlane
 
 ```bash
 cat <<EOF | oc apply -f -
@@ -901,7 +937,7 @@ oc wait --for=jsonpath='{.status.phase}'=Completed \
   restore/openstack-restore-60-dataplane-${RESTORE_SUFFIX} -n openshift-adp --timeout=5m
 ```
 
-### Step 13: EDPM Deployment
+### Step 14: EDPM Deployment
 
 Resync deployment/configuration state from restored backup on dataplane nodes:
 
@@ -920,41 +956,6 @@ spec:
 $(for ns in ${NODESETS}; do echo "  - ${ns}"; done)
 EOF
 fi
-```
-
-### Step 14: Verify and Sync Neutron to OVN
-
-If OVN database backups were not taken (Backup Steps 3 and 8 skipped), the OVN
-databases are empty after restore. The EDPM deployment reconnects
-`ovn-controller` to the empty SB database, wiping cached OVS datapath flows
-and breaking VM network connectivity. Run `neutron-ovn-db-sync-util` in
-`repair` mode to repopulate the OVN NB/SB databases from Neutron's MariaDB
-and restore connectivity.
-
-Even if OVN DB backups were restored (Step 8), run the sync in `log` mode
-first to check for any drift between the Neutron and OVN databases:
-
-```bash
-# Check for inconsistencies (log mode — read-only)
-oc rsh -n openstack -c neutron-api deploy/neutron \
-  neutron-ovn-db-sync-util \
-  --config-file /usr/share/neutron/neutron-dist.conf \
-  --config-file /etc/neutron/neutron.conf \
-  --config-dir /etc/neutron/neutron.conf.d \
-  --ovn-neutron_sync_mode=log --debug
-```
-
-If inconsistencies are found (or if Backup Step 3 was skipped), run in `repair`
-mode:
-
-```bash
-# Fix inconsistencies (repair mode)
-oc rsh -n openstack -c neutron-api deploy/neutron \
-  neutron-ovn-db-sync-util \
-  --config-file /usr/share/neutron/neutron-dist.conf \
-  --config-file /etc/neutron/neutron.conf \
-  --config-dir /etc/neutron/neutron.conf.d \
-  --ovn-neutron_sync_mode=repair --debug
 ```
 
 ### Step 15: Re-enable InstanceHa (optional)
@@ -1058,11 +1059,11 @@ oc annotate secret custom-ca-cert -n openstack \
 - **OVN DB backup is optional** and requires manually labeling the OVN PVCs
   for backup and running `ovsdb-client backup` (Step 3) before the OADP PVC
   backup. If skipped, the OVN databases will be empty after restore — see
-  Step 12 (Sync Neutron to OVN).
+  Step 10 (Sync Neutron to OVN).
 - **VM network connectivity** may be interrupted during restore. Without
   OVN DB backup (Step 3 skipped), connectivity is lost when `ovn-controller`
   reconnects to the empty SB database and is restored by
-  `neutron-ovn-db-sync-util` (Step 12).
+  `neutron-ovn-db-sync-util` (Step 10).
 - **RabbitMQ** is recreated as a fresh cluster with restored credentials
   (in-flight messages are lost)
 - **Running VM state** reflects the backup point in time. If VMs were
@@ -1073,6 +1074,6 @@ oc annotate secret custom-ca-cert -n openstack \
 - **OpenStackBaremetalSet restore annotations** — restoring `OpenStackBaremetalSet`
   resources requires the `openstack.org/skip-webhook-validation` and
   `openstack.org/paused` annotations (injected by the resource modifier in
-  Step 0). These annotations must be manually removed after restore (Step 11)
+  Step 0). These annotations must be manually removed after restore (Step 12)
   to re-enable webhook validation and operator reconciliation
 
