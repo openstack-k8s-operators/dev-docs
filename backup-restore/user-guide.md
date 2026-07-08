@@ -290,7 +290,7 @@ this step can be skipped.
 If your BaremetalHosts are in a different namespace, create an additional
 backup for that namespace. During restore, the secrets and configmaps from
 this backup — BaremetalHosts, secrets, and configmaps — are restored in
-Restore Step 11:
+Restore Step 12:
 
 ```bash
 BMH_NAMESPACE=<namespace where BaremetalHosts are located>
@@ -728,7 +728,7 @@ oc wait openstackcontrolplane -n openstack --all \
 If OVN database backups were not taken (Backup Steps 3 and 8 skipped), the OVN
 databases are empty after restore. Run `neutron-ovn-db-sync-util` in `repair`
 mode to repopulate the OVN NB/SB databases from Neutron's MariaDB before
-proceeding with the EDPM deployment (Step 14). This prevents data plane
+proceeding with the EDPM deployment (Step 15). This prevents data plane
 outage — without this step, `ovn-controller` would reconnect to empty databases
 during the EDPM deployment, wiping cached OVS datapath flows and breaking VM
 network connectivity.
@@ -738,7 +738,7 @@ first to check for any drift between the Neutron and OVN databases:
 
 ```bash
 # Check for inconsistencies (log mode — read-only)
-oc rsh -n openstack -c neutron-api deploy/neutron \
+oc exec -n openstack -c neutron-api deploy/neutron -- \
   neutron-ovn-db-sync-util \
   --config-file /usr/share/neutron/neutron-dist.conf \
   --config-file /etc/neutron/neutron.conf \
@@ -751,7 +751,7 @@ mode:
 
 ```bash
 # Fix inconsistencies (repair mode)
-oc rsh -n openstack -c neutron-api deploy/neutron \
+oc exec -n openstack -c neutron-api deploy/neutron -- \
   neutron-ovn-db-sync-util \
   --config-file /usr/share/neutron/neutron-dist.conf \
   --config-file /etc/neutron/neutron.conf \
@@ -759,7 +759,32 @@ oc rsh -n openstack -c neutron-api deploy/neutron \
   --ovn-neutron_sync_mode=repair --debug
 ```
 
-### Step 11: Restore BaremetalHosts (optional — baremetal-provisioned nodes only)
+### Step 11: Sync Octavia to OVN (optional — only when Octavia is deployed)
+
+If Octavia with the OVN provider is deployed, the OVN NB database also needs to
+be repopulated with Octavia load balancer entries. Similar to the Neutron sync
+(Step 10), `octavia-ovn-db-sync-util` recreates any missing OVN load balancer
+entries from Octavia's database.
+
+```bash
+# Sync Octavia load balancers to OVN NB database
+oc exec -n openstack -c octavia-api deploy/octavia-api -- octavia-ovn-db-sync-util
+```
+
+The tool automatically discovers all OVN-provider load balancers, listeners,
+pools, and members from Octavia's database and recreates them in the OVN NB
+database.
+
+Reference:
+- [Upstream docs](https://docs.openstack.org/ovn-octavia-provider/latest/admin/driver.html#octavia-db-to-ovn-database-population)
+- [RHOSO docs](https://docs.redhat.com/en/documentation/red_hat_openstack_services_on_openshift/18.0/html/configuring_load_balancing_as_a_service/troubleshoot-maintain-lb-service_rhoso-lbaas#about_synch-lbs-ovn-provider_trbls-lbs)
+
+> **Note:** In future versions, this tool will be integrated into
+> `neutron-ovn-db-sync-util` as a
+> [plugin](https://docs.openstack.org/ovn-octavia-provider/latest/admin/ovn-db-sync-plugin.html#synchronizing-only-octavia-resources),
+> removing the need for a separate step.
+
+### Step 12: Restore BaremetalHosts (optional — baremetal-provisioned nodes only)
 
 Skip this step if all OpenStackDataPlaneNodeSets use `preProvisioned: true`.
 
@@ -855,7 +880,7 @@ oc get bmh -n ${BMH_NAMESPACE}
 
 All BMHs should show `STATE: provisioned` and `ONLINE: true`.
 
-### Step 12: Restore OpenStackBaremetalSets (optional — baremetal-provisioned nodes only)
+### Step 13: Restore OpenStackBaremetalSets (optional — baremetal-provisioned nodes only)
 
 Skip this step if all OpenStackDataPlaneNodeSets use `preProvisioned: true`.
 
@@ -911,7 +936,7 @@ The `OpenStackBaremetalSet` will temporarily leave the `Ready` state while
 the `OpenStackProvisionServer` reconciles, but the associated BMHs remain
 untouched and their workloads are unaffected.
 
-### Step 13: Restore DataPlane
+### Step 14: Restore DataPlane
 
 ```bash
 cat <<EOF | oc apply -f -
@@ -937,7 +962,7 @@ oc wait --for=jsonpath='{.status.phase}'=Completed \
   restore/openstack-restore-60-dataplane-${RESTORE_SUFFIX} -n openshift-adp --timeout=5m
 ```
 
-### Step 14: EDPM Deployment
+### Step 15: EDPM Deployment
 
 Resync deployment/configuration state from restored backup on dataplane nodes:
 
@@ -958,7 +983,7 @@ EOF
 fi
 ```
 
-### Step 15: Re-enable InstanceHa (optional)
+### Step 16: Re-enable InstanceHa (optional)
 
 Only required if InstanceHa was used in the backed-up environment.
 After verifying the restored cloud is fully operational (see [Verification](#verification)):
@@ -1074,6 +1099,6 @@ oc annotate secret custom-ca-cert -n openstack \
 - **OpenStackBaremetalSet restore annotations** — restoring `OpenStackBaremetalSet`
   resources requires the `openstack.org/skip-webhook-validation` and
   `openstack.org/paused` annotations (injected by the resource modifier in
-  Step 0). These annotations must be manually removed after restore (Step 12)
+  Step 0). These annotations must be manually removed after restore (Step 13)
   to re-enable webhook validation and operator reconciliation
 
