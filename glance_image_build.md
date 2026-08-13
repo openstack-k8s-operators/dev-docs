@@ -33,7 +33,7 @@ the installation of the `glance-api` package with `dnf`. There are
 many ways to add the patch but in this example we will append the
 following command to the end of the list of commands.
 ```
-curl -k -L https://raw.githubusercontent.com/openstack/glance/ee7e96f06af741bb34bedac18fa2c4616fcc3905/glance/location.py -o /usr/lib/python3.9/site-packages/glance/location.py
+curl -L https://raw.githubusercontent.com/openstack/glance/ee7e96f06af741bb34bedac18fa2c4616fcc3905/glance/location.py -o /usr/lib/python3.9/site-packages/glance/location.py
 ```
 When the following command is run:
 ```
@@ -48,7 +48,7 @@ the patch was run.
 ```
 $ grep curl -B 1 -A 5 /tmp/container-builds/ac88bc87-c9d7-4270-98c7-8b0b5e64a6fc/base/os/glance-api/glance-api-build.log
 STEP 7/10: RUN sed -i -r 's,^(Listen 80),#\1,' /etc/httpd/conf/httpd.conf &&  sed -i -r 's,^(Listen 443),#\1,' /etc/httpd/conf.d/ssl.conf
-STEP 8/10: RUN curl -k -L https://raw.githubusercontent.com/openstack/glance/ee7e96f06af741bb34bedac18fa2c4616fcc3905/glance/location.py -o /usr/lib/python3.9/site-packages/glance/location.py
+STEP 8/10: RUN curl -L https://raw.githubusercontent.com/openstack/glance/ee7e96f06af741bb34bedac18fa2c4616fcc3905/glance/location.py -o /usr/lib/python3.9/site-packages/glance/location.py
   % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
                                  Dload  Upload   Total   Spent    Left  Speed
 100 27092  100 27092    0     0   117k      0 --:--:-- --:--:-- --:--:--  117k
