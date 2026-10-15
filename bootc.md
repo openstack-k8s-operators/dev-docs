@@ -1,470 +1,179 @@
 # Building and Pushing EDPM Bootc Images
 
-This guide provides step-by-step instructions for building and pushing EDPM
-bootc container images and QCOW2 disk images to your own container registry.
+This guide describes the current EDPM bootc host-image build source and a
+site-specific way to include an Intel `ice` Dynamic Device Personalization
+(DDP) profile. It also documents how to update nodes to a new bootc image.
 
-## Prerequisites
+## Build the EDPM bootc host image
 
-### System Requirements
-
-- RHEL 9.4+, CentOS Stream 9, or Fedora 41+ host system.
-- sudo access for privileged container operations
-- At least 10GB of free disk space
-- Container registry access (push permissions)
-
-### Required Packages
-
-Install the following packages on your build host:
+The EDPM bootc host image is built in the
+[`s2i-openstack-containers`](https://github.com/openstack-k8s-operators/s2i-openstack-containers)
+repository. Its source Containerfile is
+[`containers/edpm/edpm-bootc/Containerfile`](https://github.com/openstack-k8s-operators/s2i-openstack-containers/blob/main/containers/edpm/edpm-bootc/Containerfile).
+From a clone of that repository, build and push the standard host image using
+your own registry, namespace, and tag:
 
 ```bash
-sudo dnf install -y podman buildah osbuild-selinux
+REGISTRY=quay.io NAMESPACE=myorg TAG=edpm-base \
+    ./build.sh build edpm/edpm-bootc
+REGISTRY=quay.io NAMESPACE=myorg TAG=edpm-base \
+    ./build.sh push edpm/edpm-bootc
 ```
 
-## Environment Variables
-
-Set these environment variables to customize your build. Replace
-`your-registry.example.com` with your actual container registry where you have
-push permissions.
-
-```bash
-# Container registry and image names (CUSTOMIZE THESE)
-export EDPM_BOOTC_REPO="your-registry.example.com/edpm-bootc"
-export EDPM_BOOTC_TAG="latest"
-export EDPM_BOOTC_IMAGE="${EDPM_BOOTC_REPO}:${EDPM_BOOTC_TAG}"
-export EDPM_QCOW2_IMAGE="${EDPM_BOOTC_REPO}:${EDPM_BOOTC_TAG}-qcow2"
-
-# Build configuration
-export EDPM_BASE_IMAGE="quay.io/centos-bootc/centos-bootc:stream9"
-export EDPM_CONTAINERFILE="Containerfile"
-export RHSM_SCRIPT="empty.sh"  # Use "rhsm.sh" for RHEL with subscription
-export FIPS="1"  # Set to "0" to disable FIPS mode
-export USER_PACKAGES=""  # Space-separated list of additional packages to install
-```
-
-## Step 1: Obtain initial build content
-
-The files and content to build the bootc image can be obtained by either
-cloning the edpm-image-builder, or downloading the files.
-
-### Obtain initial build content by cloning the repository
-
-Clone the edpm-image-builder repository:
-
-```bash
-git clone https://github.com/openstack-k8s-operators/edpm-image-builder.git
-cd edpm-image-builder
-```
-
-### Obtain initial build content by downloading
-
-Download the necessary files:
-
-```bash
-mkdir -p bootc
-pushd bootc
-curl -O https://raw.githubusercontent.com/openstack-k8s-operators/edpm-image-builder/55ba53cf215b14ed95bc80c8e8ed4b29a45fd4ae/bootc/Containerfile
-curl -O https://raw.githubusercontent.com/openstack-k8s-operators/edpm-image-builder/refs/heads/main/bootc/rhsm.sh
-chmod +x rhsm.sh
-mkdir -p ansible-facts
-pushd ansible-facts
-curl -O https://raw.githubusercontent.com/openstack-k8s-operators/edpm-image-builder/55ba53cf215b14ed95bc80c8e8ed4b29a45fd4ae/bootc/ansible-facts/bootc.fact
-popd
-popd
-curl -O https://raw.githubusercontent.com/openstack-k8s-operators/edpm-image-builder/55ba53cf215b14ed95bc80c8e8ed4b29a45fd4ae/Containerfile.image
-curl -O https://raw.githubusercontent.com/openstack-k8s-operators/edpm-image-builder/55ba53cf215b14ed95bc80c8e8ed4b29a45fd4ae/copy_out.sh
-chmod +x copy_out.sh
-```
-
-## Step 2: Prepare the Build Environment
-
-Navigate to the bootc directory:
-
-```bash
-cd bootc/
-```
-
-Create the output directory:
-
-```bash
-mkdir -p output/yum.repos.d
-```
-
-## Step 3: Set Up Repository Configuration
-
-### Centos Stream 9
-
-#### Download and Install repo-setup Tool
-
-```bash
-pushd output
-curl -sL https://github.com/openstack-k8s-operators/repo-setup/archive/refs/heads/main.tar.gz | tar xvz
-pushd repo-setup-main
-python3 -m venv ./venv
-source ./venv/bin/activate
-PBR_VERSION=0.0.0 python3 -m pip install ./
-cp venv/bin/repo-setup ../repo-setup
-popd
-```
-
-#### Generate Repository Configuration
-
-Configure the OpenStack rpm repositories to use during the container image
-build:
-
-```bash
-# Set repository configuration (optional, these are defaults)
-export REPO_SETUP="current-podified"
-export REPO_SETUP_BRANCH="antelope"
-export REPO_SETUP_DISTRO="centos9"
-export REPO_SETUP_MIRROR="https://trunk.rdoproject.org"
-
-# Generate repository files
-mkdir -p output/yum.repos.d
-pushd output
-repo-setup \
-    --output-path yum.repos.d \
-    --branch ${REPO_SETUP_BRANCH} \
-    --rdo-mirror ${REPO_SETUP_MIRROR} \
-    -d ${REPO_SETUP_DISTRO} \
-    ${REPO_SETUP}
-popd
-```
-
-### RHEL 9.4+
-
-For RHEL-based builds with subscription-manager, modify `rhsm.sh`:
-
-1. Edit the subscription variables in `rhsm.sh`:
-   ```bash
-   RHSM_USER=your_username
-   RHSM_PASSWORD=your_password
-   RHSM_POOL=your_pool_id  # Only if SCA is disabled
-   ```
-
-2. Further edit `rhsm.sh` as needed, such as to run a `subscription-manager`
-   command with an activation key. Or, use any custom script to enable any
-   needed repositories.
-
-2. Use the RHEL subscription script:
-   ```bash
-   export RHSM_SCRIPT="rhsm.sh"
-   ```
-
-## Step 4: Build the Bootc Container Image
-
-### Configure Base Image
-
-You can use different base images:
-
-> #### RHEL 9.4+
-> ```bash
-> # For RHEL 9 (requires subscription)
-> export EDPM_BASE_IMAGE="registry.redhat.io/rhel9/rhel-bootc:9.4"
-> ```
->
-> Login to registry.redhat.io
-> ```bash
-> sudo podman login registry.redhat.io
-> ```
-
-> #### Centos Stream 9
-> ```bash
-> # For CentOS Stream 9 (default)
-> export EDPM_BASE_IMAGE="quay.io/centos-bootc/centos-bootc:stream9"
-> ```
-
-Build the EDPM bootc container image:
-
-```bash
-sudo buildah bud \
-    --build-arg EDPM_BASE_IMAGE=${EDPM_BASE_IMAGE} \
-    --build-arg RHSM_SCRIPT=${RHSM_SCRIPT} \
-    --build-arg FIPS=${FIPS} \
-    --build-arg USER_PACKAGES="${USER_PACKAGES}" \
-    --volume /etc/pki/ca-trust:/etc/pki/ca-trust:ro,Z \
-    --volume $(pwd)/output/yum.repos.d:/etc/yum.repos.d:rw,Z \
-    -f ${EDPM_CONTAINERFILE} \
-    -t ${EDPM_BOOTC_IMAGE} \
-    .
-```
-
-### Verify the Build
-
-Check that the image was created successfully:
-
-```bash
-sudo podman images | grep ${EDPM_BOOTC_REPO}
-```
-
-## Step 5: Push the Bootc Container Image
-
-Push the bootc container image to your registry:
-
-```bash
-sudo podman push ${EDPM_BOOTC_IMAGE}
-```
-
-## Step 6: Generate a QCOW2 Disk Image (Optional)
-
-If you need a QCOW2 disk image for deployment:
-
-> ### RHEL 9.4+
-> ```bash
-> export BUILDER_IMAGE="registry.redhat.io/rhel9/bootc-image-builder:latest"
-> ```
-
-> ### Centos Stream 9
-> ```bash
-> export BUILDER_IMAGE="quay.io/centos-bootc/bootc-image-builder:latest"
-> ```
-
-```bash
-sudo podman run \
-    --rm \
-    -it \
-    --privileged \
-    --security-opt label=type:unconfined_t \
-    -v ./output:/output \
-    -v /var/lib/containers/storage:/var/lib/containers/storage \
-    ${BUILDER_IMAGE} \
-    --type qcow2 \
-    ${EDPM_BOOTC_IMAGE}
-```
-
-Move and checksum the generated QCOW2:
-
-```bash
-pushd output
-sudo mv qcow2/disk.qcow2 edpm-bootc.qcow2
-sudo sha256sum edpm-bootc.qcow2 > edpm-bootc.qcow2.sha256
-popd
-```
-
-## Step 7: Package QCOW2 in Container (Optional)
-
-To distribute the QCOW2 image as a container:
-
-### Prepare packaging files:
-
-```bash
-cp ../copy_out.sh output/
-cp ../Containerfile.image output/
-```
-
-### Build the QCOW2 container:
-
-> #### RHEL 9.4+
->
-> ```bash
-> export BASE_IMAGE=registry.redhat.io/rhel9-4-els/rhel:9.4
-> ```
-
-> #### Centos Stream 9
->
-> ```bash
-> export BASE_IMAGE=quay.io/centos/centos:stream9-minimal
-> ```
-
-```bash
-pushd output
-sudo buildah bud \
-    --build-arg IMAGE_NAME=edpm-bootc \
-    --build-arg BASE_IMAGE=${BASE_IMAGE} \
-    -f ./Containerfile.image \
-    -t ${EDPM_QCOW2_IMAGE} \
-    .
-popd
-```
-
-### Push the QCOW2 container:
-
-```bash
-sudo podman push ${EDPM_QCOW2_IMAGE}
-```
-
-## Customization Options
-
-### FIPS Configuration
-
-To disable FIPS mode:
-
-```bash
-export FIPS="0"
-```
-
-### Package Customization
-
-The Containerfile defines several package groups that can be customized by
-modifying the build args. Key package categories include:
-
-- `BOOTSTRAP_PACKAGES`: Core system packages
-- `OVS_PACKAGES`: Open vSwitch packages
-- `PODMAN_PACKAGES`: Container runtime packages
-- `LIBVIRT_PACKAGES`: Virtualization packages
-- `CEPH_PACKAGES`: Ceph storage packages
-- `USER_PACKAGES`: User-customizable packages for additional functionality
-
-#### Adding Custom Packages with USER_PACKAGES
-
-The `USER_PACKAGES` build argument allows you to inject additional packages into the bootc image during build time. This is useful for adding site-specific tools, drivers, or utilities that are not included in the default package sets.
-
-**Usage:**
-
-```bash
-# Add custom packages during build
-export USER_PACKAGES="vim htop strace tcpdump"
-
-sudo buildah bud \
-    --build-arg EDPM_BASE_IMAGE=${EDPM_BASE_IMAGE} \
-    --build-arg RHSM_SCRIPT=${RHSM_SCRIPT} \
-    --build-arg FIPS=${FIPS} \
-    --build-arg USER_PACKAGES="${USER_PACKAGES}" \
-    --volume /etc/pki/ca-trust:/etc/pki/ca-trust:ro,Z \
-    --volume $(pwd)/output/yum.repos.d:/etc/yum.repos.d:rw,Z \
-    -f ${EDPM_CONTAINERFILE} \
-    -t ${EDPM_BOOTC_IMAGE} \
-    .
-```
-
-**Examples:**
-
-```bash
-# Add debugging and monitoring tools
-export USER_PACKAGES="vim htop strace tcpdump iperf3 curl wget"
-
-# Add storage-related utilities
-export USER_PACKAGES="lvm2 multipath-tools sg3_utils"
-
-# Add network debugging tools
-export USER_PACKAGES="nmap netcat-openbsd traceroute mtr"
-
-# Add development tools
-export USER_PACKAGES="git gcc make python3-pip"
-```
-
-**Important Notes:**
-
-- Package names must be valid for the base OS repository (CentOS Stream 9 or RHEL 9)
-- Packages must be available in the configured repositories
-- Adding too many packages will increase the image size
-- Verify package availability before building to avoid build failures
-
-## Troubleshooting
-
-### Build Fails with Permission Errors
-
-Ensure you're using `sudo` with buildah and podman commands for privileged
-operations.
-
-### Repository Configuration Issues
-
-If package installation fails, verify your repository configuration:
-
-```bash
-ls -la output/yum.repos.d/
-```
-
-### Container Registry Authentication
-
-Ensure you're logged into your container registry:
-
-```bash
-sudo podman login your-registry.example.com
-```
-
-### Storage Space Issues
-
-Bootc images can be large. Clean up old images if needed:
-
-```bash
-sudo podman system prune -a
-```
-
-## Image Contents
-
-The resulting bootc image includes:
-
-- **Base OS**: CentOS Stream 9 or RHEL 9 with bootc
-- **OpenStack Components**: Packages for EDPM node functionality
-- **Container Runtime**: Podman and Buildah for workload containers
-- **Networking**: Open vSwitch and NetworkManager configuration
-- **Storage**: LVM, multipath, and Ceph client tools
-- **Virtualization**: Libvirt and QEMU for compute nodes
-- **Security**: FIPS mode enabled by default
-- **Monitoring**: System monitoring and logging tools
-
-### Extract QCOW2 from Container (Usage)
-
-To extract the QCOW2 image from the container:
-
-```bash
-# Create directory for extracted images
-mkdir -p /path/to/extracted/images
-
-# Extract QCOW2 from container
-podman run \
-    --volume /path/to/extracted/images:/target:Z \
-    --rm \
-    ${EDPM_QCOW2_IMAGE}
-```
-
-## Cleanup
-
-To clean up build artifacts:
-
-```bash
-# Remove output directory
-sudo rm -rf output
-
-# Remove container images (optional)
-sudo podman rmi --force ${EDPM_BOOTC_IMAGE} || true
-sudo podman rmi --force ${BUILDER_IMAGE} || true
-sudo podman rmi --force ${EDPM_QCOW2_IMAGE} || true
-```
-
-## Using the QCOW2 Container Image with OpenStackDataPlaneNodeSet
-
-After building and pushing your QCOW2 container image, you can use it when creating an OpenStackDataPlaneNodeSet resource. The key fields to configure are `osImage` and `osContainerImageUrl`.
-
-### Example OpenStackDataPlaneNodeSet Configuration
+The current Containerfile installs EDPM host RPMs and removes
+`dracut-config-generic`; it does not add a DDP firmware profile or regenerate
+initramfs for DDP. `USER_PACKAGES` installs repository RPMs and is not a means
+to copy an arbitrary `.pkg` artifact. For DDP, maintain a site-specific image
+customization as described below. Do not download an old
+`edpm-image-builder/bootc/Containerfile`: the host-image Containerfile is now
+in `s2i-openstack-containers`.
+
+For the separate bootc-image-builder workflow that converts the published host
+image to a QCOW2 image and packages it for EDPM deployment, follow the current
+[`edpm-image-builder/bootc/README.rst`](https://github.com/openstack-k8s-operators/edpm-image-builder/blob/main/bootc/README.rst).
+For bare-metal deployment, use the customized host image as the input to that
+QCOW2 workflow, then set the packaged QCOW2 image on the node set:
 
 ```yaml
-apiVersion: dataplane.openstack.org/v1beta1
 kind: OpenStackDataPlaneNodeSet
-metadata:
-  name: edpm-compute-bootc
-  namespace: openstack
 spec:
-  preProvisioned: False
-  # Baremetal configuration with OS image settings
   baremetalSetTemplate:
-    # Configure the OS image settings
+    osContainerImageUrl: <custom-repo>:<custom-tag>-qcow2
     osImage: edpm-bootc.qcow2
-    osContainerImageUrl: your-registry.example.com/edpm-bootc:latest-qcow2
-
 ```
 
-### Field Descriptions
+See the linked README for the current packaging and deployment steps.
 
-- **`baremetalSetTemplate.osImage`**: The filename of the QCOW2 image that will be extracted from the container. This should match the filename inside your QCOW2 container image (typically `edpm-bootc.qcow2`).
+## Build a site-specific image with a DDP profile
 
-- **`baremetalSetTemplate.osContainerImageUrl`**: The full URL to your QCOW2 container image that was built and pushed in the previous steps. This is the image tagged with `-qcow2` suffix (e.g., `your-registry.example.com/edpm-bootc:latest-qcow2`).
+The Intel `ice` driver looks for `intel/ice/ddp/ice.pkg` in the firmware root
+and loads DDP during device initialization. Profiles are supplied as `.pkg`
+files. On bootc, do not use a runtime role to change the firmware link,
+regenerate initramfs, or reload the driver. Include the vendor/NIC-supported
+profile in the image, make the canonical `ddp/ice.pkg` path resolve to it, and
+regenerate initramfs during the image build. Switch the node to the custom
+image and reboot to activate it. A running PF cannot be updated with a new
+profile until the driver is unloaded and reloaded; that is not a bootc runtime
+operation supported by this workflow.
 
+Use a `.pkg` artifact provided and named according to the NIC vendor's
+instructions. This guide does not prescribe an RPM or artifact download URL.
+The profile file belongs under
+`/lib/firmware/intel/ice/<edpm_ddp_package>/`; the directory name must equal
+the `edpm_ddp_package` value supplied to the role (for example, `ddp-comm`).
+The selected filename must satisfy the role's `ice*.pkg*` pattern. The
+canonical `/lib/firmware/intel/ice/ddp/ice.pkg` link must resolve to that
+selected file.
 
-### Verification
-
-After applying the OpenStackDataPlaneNodeSet, verify that the configuration is correct:
+First build and push the standard image above. Then create a site-owned build
+context with the supplied profile artifact copied locally as `ddp.pkg` and a
+site-maintained `Containerfile.ddp` based on that published image. Set the
+following values to match the image and artifact supplied for your NIC:
 
 ```bash
-# Check the NodeSet status
-oc get openstackdataplanenodeset edpm-compute-bootc -o yaml
-
-# Verify the deployment progress
-oc get openstackdataplanedeployment
-
-# Check the logs for image download and extraction
-oc logs -f deployment/dataplane-operator-controller-manager -n openstack-operators
+export EDPM_BOOTC_BASE="quay.io/myorg/openstack-edpm-bootc:edpm-base"
+export DDP_PROFILE="ddp-comm" # Must equal edpm_ddp_package at runtime.
+export DDP_FILENAME="<vendor-supported-ice-package>.pkg"
+export EDPM_BOOTC_DDP_IMAGE="quay.io/myorg/openstack-edpm-bootc:ddp-custom"
 ```
+
+Use the following as a site-specific Containerfile template. The `COPY`
+instruction copies the user-supplied artifact from the build context; it is
+not fetched from an RPM repository or URL. Keep the filename and directory
+values consistent with the vendor's requirements.
+
+```Dockerfile
+ARG EDPM_BOOTC_BASE
+FROM ${EDPM_BOOTC_BASE}
+
+ARG DDP_PROFILE
+ARG DDP_FILENAME
+COPY ddp.pkg /tmp/site-ddp.pkg
+
+RUN set -eu; \
+    test -n "${DDP_PROFILE}"; \
+    test -n "${DDP_FILENAME}"; \
+    case "${DDP_FILENAME}" in ice*.pkg*) ;; *) echo "DDP_FILENAME must match ice*.pkg*" >&2; exit 1 ;; esac; \
+    install -D -m 0644 /tmp/site-ddp.pkg "/lib/firmware/intel/ice/${DDP_PROFILE}/${DDP_FILENAME}"; \
+    mkdir -p /lib/firmware/intel/ice/ddp; \
+    ln -sfn "../${DDP_PROFILE}/${DDP_FILENAME}" /lib/firmware/intel/ice/ddp/ice.pkg; \
+    command -v dracut; \
+    for modules_dir in /usr/lib/modules/*; do \
+        test -d "${modules_dir}" || continue; \
+        kver="${modules_dir##*/}"; \
+        dracut --force --add-drivers ice --install /lib/firmware/intel/ice/ddp/ice.pkg "${modules_dir}/initramfs.img" "${kver}"; \
+    done; \
+    rm -f /tmp/site-ddp.pkg
+
+RUN bootc container lint
+```
+
+Build and push the site image from the customized build context:
+
+```bash
+podman build \
+    --build-arg EDPM_BOOTC_BASE="${EDPM_BOOTC_BASE}" \
+    --build-arg DDP_PROFILE="${DDP_PROFILE}" \
+    --build-arg DDP_FILENAME="${DDP_FILENAME}" \
+    -f Containerfile.ddp \
+    -t "${EDPM_BOOTC_DDP_IMAGE}" .
+podman push "${EDPM_BOOTC_DDP_IMAGE}"
+```
+
+### Verify the built image
+
+Verify the profile file, canonical link, and initramfs payload independently in
+the image. This checks that the bytes at the canonical firmware path are also
+present at that path in each installed kernel's initramfs. It does not prove
+NIC compatibility, successful device initialization, or that a profile was
+accepted by a particular adapter.
+
+```bash
+podman run --rm \
+    --env DDP_PROFILE \
+    --env DDP_FILENAME \
+    --entrypoint /bin/bash "${EDPM_BOOTC_DDP_IMAGE}" -ec '
+set -euo pipefail
+profile_file="/lib/firmware/intel/ice/${DDP_PROFILE}/${DDP_FILENAME}"
+canonical="/lib/firmware/intel/ice/ddp/ice.pkg"
+test -f "${profile_file}"
+test -L "${canonical}"
+test "$(readlink -f "${canonical}")" = "$(readlink -f "${profile_file}")"
+runtime_sha256=$(sha256sum "${canonical}" | cut -d " " -f 1)
+found_kernel=0
+for modules_dir in /usr/lib/modules/*; do
+    test -d "${modules_dir}" || continue
+    found_kernel=1
+    initramfs="${modules_dir}/initramfs.img"
+    test -s "${initramfs}"
+    initramfs_sha256=$(lsinitrd -f "${canonical}" "${initramfs}" | sha256sum | cut -d " " -f 1)
+    test "${runtime_sha256}" = "${initramfs_sha256}"
+    printf "%s: DDP SHA-256 %s matches the initramfs\n" "${initramfs}" "${runtime_sha256}"
+done
+test "${found_kernel}" = 1
+'
+```
+
+After verifying the image, update the node to use the pushed custom image and
+reboot it. The custom image build and runtime role invocation are separate: the
+build bakes in the profile and initramfs. In an `edpm-ansible` version that
+implements the bootc validation contract, the role path is read-only and
+validates the profile selection, canonical runtime link, and payload in the
+currently booted kernel's initramfs. It does not build or modify the image, or
+validate NIC compatibility or device readiness.
+
+When invoking `select_kernel_ddp_package` on a bootc node, pass the same
+`edpm_ddp_package` value used as `DDP_PROFILE` during the image build. For
+example, with `DDP_PROFILE=ddp-comm`:
+
+```bash
+ansible-playbook playbooks/select_kernel_ddp_package.yml \
+    --extra-vars edpm_ddp_package=ddp-comm
+```
+
+This example describes the validation-only bootc behavior; it does not apply a
+runtime firmware change. Use an `edpm-ansible` version that implements this
+bootc validation contract.
 
 ## Updating EDPM Bootc Nodes
 
@@ -669,6 +378,5 @@ oc apply -f edpm-update-bootc.yaml
 - **Package Updates**: Remember that bootc nodes cannot update individual RPM packages - all updates must be included in the bootc container image
 - **Rollback**: Bootc supports rollback to previous images using `bootc rollback` if issues occur
 - **Verification**: After reboot, verify the new image is active using `bootc status`
-
 
 For more information on deploying and updating these images, refer to the OpenStack EDPM documentation and the update procedure guides linked above.
