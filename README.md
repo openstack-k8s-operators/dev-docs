@@ -36,3 +36,4 @@ Developer Documentation related to podified controlplane.
 * [Hotfix process - Building custom OpenStack Images](hotfix_process.md)
 * [Application Credentials](application_credentials.md)
 * [Backup and Restore](backup-restore/README.md)
+* [Building and Pushing EDPM Bootc Images](bootc.md)
