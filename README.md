@@ -9,6 +9,7 @@ Developer Documentation related to podified controlplane.
 * [Quickstart on writing KUTTL tests for an operator](kuttl_tests.md)
 * [Building operator images](image_build.md)
 * [Building operator upgrade catalogs for OLM](olm_upgrades.md)
+* [How service operators are vendored and installed](service_operator_installation.md)
 * [Building custom OpenStack images](glance_image_build.md)
 * [Debugging operator via vscode](debugging.md)
 * [Testing local changes to lib-common](testing_lib_common.md)
