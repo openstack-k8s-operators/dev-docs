@@ -59,15 +59,16 @@ spec:
 
 ## Custom images for Cinder Volume
 In order to allow administrators to configure customized Cinder volume backends
-with certified 3rd party vendor containerImages for any of the backends, 
+with certified 3rd party vendor containerImages for any of the backends,
 administrators will be allowed to explicitly specify those images overriding the
-default containerImage during automatic updates. This is a manual operation 
+default containerImage during automatic updates. This is a manual operation
 because there is no way to fully automate the selection of those images at this
-time. To configure a Cinder volume backend named 'pure' with a different image 
-during the updates, the administrator can add the name 'pure' to the
-'cinderVolumeImages' map within the 'customContainerImages' section of
-the OpenStackVersion CR and set a custom image to be used for that volume backend.
-Multiple named Cinder volume backends may be configured in this manner.
+time. Map keys under `cinderVolumeImages` are **CinderVolume resource names**
+(the keys under `spec.cinder.template.cinderVolumes` on the control plane), not
+the Cinder `volume_backend_name` from the volume service configuration. For
+example, a Pure FC sample may use resource name `pure-fc` while the backend
+config still sets `volume_backend_name=pure` — the OpenStackVersion map key must
+be `pure-fc`. Multiple named CinderVolume resources may be configured this way.
 
 NOTE: if the backend does not require a custom container the default cinder
 volume container is used automatically. This means if you are only using
@@ -85,15 +86,19 @@ spec:
   customContainerImages:
     cinderVolumeImages:
       default: quay.io/podified-antelope-centos9/openstack-cinder-volume@sha256:886942a49a89be8ee12b3b6c220cbea3aead4ee3d9f18f97757eb7d795f241c6
-      pure: <custom image URL location>
+      pure-fc: <custom image URL location>
 ```
 
 ## Custom images for Manila Share
 
-Similar to the Cinder example above certified Manila Share images
-may be customized by updating the 'manilaShareImages' map
-within the 'customContainerImages' section of the OpenStackVersion
-CR and then set to a custom container image for the named backend.
+Similar to the Cinder example above, certified Manila Share images may be
+customized by updating the `manilaShareImages` map within the
+`customContainerImages` section of the OpenStackVersion CR. Map keys are
+**ManilaShare resource names** (the keys under
+`spec.manila.template.manilaShares`), not the Manila `share_backend_name` from
+share service configuration. For example, resource name `share0` may back a
+backend such as `cephfs` or `dummy0` in config — the OpenStackVersion map key
+must be `share0`.
 
 ```yaml
 apiVersion: core.openstack.org/v1beta1
@@ -106,7 +111,7 @@ spec:
   customContainerImages:
     manilaShareImages:
       default: quay.io/podified-antelope-centos9/openstack-manila-share@sha256:55c6acf35d6a4e26228a49d5dcc86a8e0ca54d32b55e3465535b2aa0111f76e2
-      custom: <custom image URL location>
+      share0: <custom image URL location>
 ```
 
 ## Custom Images for Neutron ML2
