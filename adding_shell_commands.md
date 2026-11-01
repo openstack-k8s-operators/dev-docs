@@ -7,8 +7,13 @@ tools like `ping` and `ncat` are not available in containers running in a
 podified controlplane.
 
 However, it is possible to install commands into podified containers. Here is
-an example that installs the `ip` command into the cinder-backup container in
-the cinder-backup-0 pod.
+an example that installs the `ip` command into the cinder-backup container.
+Discover the pod first so the steps work when `uniquePodNames` is enabled:
+
+```shell
+CINDER_NAME=$(oc get cinder -n openstack -o jsonpath='{.items[0].metadata.name}')
+CINDER_BACKUP_POD=${CINDER_NAME}-backup-0
+```
 
 ## Prerequisites
 
@@ -33,7 +38,7 @@ and it's necessary to install the absolute file.
 2. Use `kubectl` to copy the file into the container
 
 ```shell
-kubectl cp /usr/sbin/ip cinder-backup-0:/usr/sbin/
+kubectl cp /usr/sbin/ip ${CINDER_BACKUP_POD}:/usr/sbin/
 ```
 
 If necessary, you can include `"-c container"` to specify a particular
@@ -42,7 +47,7 @@ container within the pod.
 3. Check to see if additional libraries need to be installed
 
 ```shell
-oc rsh cinder-backup-0 ldd /usr/sbin/ip
+oc rsh ${CINDER_BACKUP_POD} ldd /usr/sbin/ip
 ```
 
 Look for any "libXXX => not found" lines, seen here:
@@ -69,12 +74,12 @@ in the container, and does not follow the source's symlink.
 
 ```shell
 # Install the symlinks from the ldd output
-kubectl cp /lib64/libbpf.so.1 cinder-backup-0:/lib64/
-kubectl cp /lib64/libmnl.so.0 cinder-backup-0:/lib64/
+kubectl cp /lib64/libbpf.so.1 ${CINDER_BACKUP_POD}:/lib64/
+kubectl cp /lib64/libmnl.so.0 ${CINDER_BACKUP_POD}:/lib64/
 
 # Copy the absolute files referenced by the symlinks
-kubectl cp /lib64/libbpf.so.1.2.0 cinder-backup-0:/lib64/
-kubectl cp /lib64/libmnl.so.0.2.0 cinder-backup-0:/lib64/
+kubectl cp /lib64/libbpf.so.1.2.0 ${CINDER_BACKUP_POD}:/lib64/
+kubectl cp /lib64/libmnl.so.0.2.0 ${CINDER_BACKUP_POD}:/lib64/
 ```
 
 The `ip` command is now available for use within in the cinder-backup

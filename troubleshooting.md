@@ -114,16 +114,17 @@ route traffic to the Pod then you can use `--keep-labels=true` in the
 `oc debug` command to keep the duplicated Pod as a backed of the related
 Service.
 
-The debug command can be used not only on a specific `Pod` (`oc debug
-cinder-api-0`) but also on any resource that creates pods such as
-`Deployments`, `StatefulSets`, etc. as well as `Nodes`.  For example: `oc debug
-StatefulSet/cinder-scheduler`.
+The debug command can be used not only on a specific `Pod` but also on any
+resource that creates pods such as `Deployments`, `StatefulSets`, etc. as well
+as `Nodes`. Discover Cinder/Glance pods first when `uniquePodNames` may be
+enabled (CR name gets a short UID hash):
 
-By default `oc debug` will run `/bin/sh` on the first container of the pod, but
-we can easily specify a different container to debug.  This is useful for pods
-like the API where the first container is tailing a file and its the second
-container the one we usually want to debug.  For example: `oc debug -c
-cinder-api pod/cinder-api-0`.
+```
+CINDER_NAME=$(oc get cinder -n openstack -o jsonpath='{.items[0].metadata.name}')
+oc debug -c cinder-api pod/${CINDER_NAME}-api-0
+# or against the StatefulSet directly:
+oc debug StatefulSet/${CINDER_NAME}-scheduler
+```
 
 We can use these last 2 functionalities, debugging non `Pod` resources and
 specifying the container, to debug Init Containers.  For example: `oc debug
@@ -163,7 +164,8 @@ guide](https://github.com/openstack-k8s-operators/glance-operator/blob/main/docs
 Run a debug `Pod` with the following command:
 
 ```
-oc debug pod/glance-default-external-api-0 --keep-labels=true
+GLANCE_POD=$(oc get pods -n openstack -o name | grep -E 'glance(-[a-z0-9]+)?-default-external-api-[0-9]+$' | head -n1)
+oc debug ${GLANCE_POD} --keep-labels=true
 ```
 
 2. Confirm the pod can reach the Ceph cluster
