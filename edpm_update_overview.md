@@ -2,25 +2,22 @@
 
 ## Overview
 
-The EDPM update process is executed in two separate steps of updating OVN, then updating the rest of the services.
+The update of the EDPM nodes is split into two parts:
 
-The update of the rest of the EDPM services is split into two phases:
+- **Update of OpenStack**: update of OVN and OpenStack service containers and the associated system-level RPM packages they depend on. The OVN update is a separate step due to update ordering requirements of OVN. The full OpenStack update should be completed as a single procedure. Its phases are monitored by the openstack-operator and its OpenStackVersion resource.
+- **Update of the operating system**: Update of all other system-related RPM packages. This procedure can be done separately from the OpenStack update. It is not monitored by the OpenStackVersion resource.
 
-- **Phase 1:** Update of OpenStack service containers and the associated system-level RPM packages they depend on.
-- **Phase 2:** Update of all other system-related RPM packages.
+With two-part approach operators gain finer control over the update process, reducing risks and simplifying troubleshooting in the event of issues. The previous monolithic update procedure is no longer available.
 
-With two-phased approach operators gain finer control over the update process, reducing risks and simplifying troubleshooting in the event of issues. The previous monolithic update procedure is no longer available.
+## Update OpenStack Services and RPM Dependencies
 
-## Phase 1: Update OpenStack Services and RPM Dependencies
+### Prerequisite: OVN updated as part of the larger OpenStack update procedure
 
-### Prerequisites
-
-Before proceeding, ensure the following conditions are met:
-- All OVN services on the EDPM nodes have been successfully updated as per the OpenStack minor update [procedure](version_updates.md#ordering-of-service-updates-normal-vs-minor-updates).
+Before proceeding, ensure that the OVN services have been successfully updated both on the control plane and on EDPM nodes, as per the [OpenStack minor update procedure](version_updates.md#ordering-of-service-updates-normal-vs-minor-updates).
 
 ### Description
 
-This phase focuses on updating only the required RPM packages, pulling new container images for the OpenStack services, and for some services re-rendering config files. It does not perform a full system-wide package update.
+This phase focuses on updating the containerized OpenStack services and their RPM dependencies, and for some services re-rendering config files. It does not perform a full system-wide RPM package update.
 
 ### Execution
 
@@ -42,7 +39,7 @@ Implementation details:
 - code for integration between openstack-operator and the role was introduce in this PR: https://github.com/openstack-k8s-operators/openstack-operator/pull/1478.
 It is worth to note that `EDPMServiceType` expected by `openstack-operator` to differentiate regular `OpenstackDataplaneDeployment`, from update type of deployment, must be "update-services".
 
-## Phase 2: Update System-Related RPM Packages
+## Update of the Operating System
 
 ### Description
 
