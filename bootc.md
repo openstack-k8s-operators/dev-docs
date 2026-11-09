@@ -474,9 +474,9 @@ For EDPM nodes deployed with bootc images, the update process differs from tradi
 
 EDPM bootc nodes use a container-based operating system that can be updated by switching to new container images and rebooting.
 
-The EDPM update procedure updates OVN initially on its own. The remainder of the
-update is split into two phases that update the services and system separately,
-as described in the [EDPM update overview](edpm_update_overview.md).
+The OpenStack update updates OVN first, followed by the services. The system
+update is separate and can run without an OpenStack update, as described in the
+[EDPM update overview](edpm_update_overview.md).
 
 This procedure requires special handling for bootc, as described below.
 
@@ -541,10 +541,17 @@ spec:
 oc apply -f edpm-update-system-selinux.yaml
 ```
 
-5. Reboot the nodes to activate the new image if the `reboot-os` service was not
+5. Verify the OpenStackDataPlaneDeployment completes successfully.
+
+6. Reboot the nodes to activate the new image if the `reboot-os` service was not
    included on the OpenStackDataPlaneDeployment.
 
-6. Create `edpm-update-services-bootc.yaml` Deployment to update the services.
+#### OpenStack services update
+
+Perform the following steps regardless of whether an `openstack-selinux` update
+was necessary.
+
+1. Create `edpm-update-services-bootc.yaml` Deployment to update the services.
 
 ```yaml
 # Step 2: Update OpenStack services
@@ -559,13 +566,13 @@ spec:
     - update-services
 ```
 
-7. Apply `edpm-update-services-bootc.yaml`
+2. Apply `edpm-update-services-bootc.yaml`
 
 ```bash
 oc apply -f edpm-update-services-bootc.yaml
 ```
 
-8. Verify the OpenStackDataPlaneDeployment completes successfully.
+3. Verify the OpenStackDataPlaneDeployment completes successfully.
 
 No reboot is required since only the remaining services were updated.
 

@@ -4,8 +4,14 @@
 
 The update of the EDPM nodes is split into two parts:
 
-- **Update of OpenStack**: update of OVN and OpenStack service containers and the associated system-level RPM packages they depend on. The OVN update is a separate step due to update ordering requirements of OVN. The full OpenStack update should be completed as a single procedure. Its phases are monitored by the openstack-operator and its OpenStackVersion resource.
-- **Update of the operating system**: Update of all other system-related RPM packages. This procedure can be done separately from the OpenStack update. It is not monitored by the OpenStackVersion resource.
+- **Update of OpenStack**: update of OVN, OpenStack service containers, and any required system package dependencies. The OVN update is a separate step due to update ordering requirements of OVN. The full OpenStack update should be completed as a single procedure. Its phases are monitored by the openstack-operator and its OpenStackVersion resource.
+- **Update of the operating system**: Update of the remaining operating-system components. This procedure can be done separately from the OpenStack update. It is not monitored by the OpenStackVersion resource.
+
+**Bootc nodes:** The update model described here also applies to bootc-based
+EDPM nodes, but system package changes are delivered through a bootc image
+rather than individual RPM updates. For the bootc-specific update procedure,
+see [Updating EDPM Bootc Nodes](bootc.md#updating-edpm-bootc-nodes). The
+package-level execution details below apply to RPM-based EDPM nodes.
 
 With two-part approach operators gain finer control over the update process, reducing risks and simplifying troubleshooting in the event of issues. The previous monolithic update procedure is no longer available.
 
