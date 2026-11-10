@@ -18,7 +18,7 @@ before starting the next.
 | 20 | OpenStackVersion, OpenStackBackupConfig, Issuers, NetConfig, Topology, BGPConfiguration, DNSData, InstanceHa | Infrastructure base (**InstanceHa restored with `spec.disabled: True`**) |
 | 30 | OpenStackControlPlane, Reservation | **Restored with `deployment-stage: infrastructure-only` annotation** |
 | 40 | GaleraBackup, IPSet, DataPlaneService | Backup config, IP sets, custom DataPlane services |
-| 50 | **Manual**: Database restore | Create GaleraRestore CRs, restore databases, remove deployment-stage annotation |
+| 50 | **Manual**: Database restore | Create GaleraRestore CRs, restore databases, remove deployment-stage annotation, restart the Nova pods (Step 6c) |
 | 55 | BaremetalHosts (Step 7), OpenStackBaremetalSet (Step 8) | Optional: baremetal-provisioned nodes only. BMH secrets/CMs restored here if separate namespace. Requires BMH pause annotation, OSBMS webhook-skip and pause annotations (resource modifier), and `restoreStatus` |
 | 60 | OpenStackDataPlaneNodeSet | DataPlane resources (optional) |
 | - | OpenStackDataPlaneDeployment | Resync credentials on dataplane nodes |
@@ -84,6 +84,8 @@ The playbook runs all restore steps in order, including:
 - Automated database restore (creates GaleraRestore CRs, runs restore script)
 - Removes deployment-stage annotation to resume full deployment
 - Waits for control plane to be ready
+- Restarts the Nova control plane service pods so they re-read the restored cell mappings
+  (`cifmw_backup_restore_restart_nova`, default `true`)
 - Optional DataPlane restore
 - EDPM deployment to resync credentials on dataplane nodes
 
@@ -370,6 +372,43 @@ Wait for all OpenStack services to start:
 oc wait openstackcontrolplane -n openstack --for=condition=Ready --timeout=30m \
   $(oc get openstackcontrolplane -n openstack -o jsonpath='{.items[0].metadata.name}')
 ```
+
+#### Step 6c: Restart the Nova Services
+
+The restored `nova_api.cell_mappings` carry the cell database credentials from
+before the restore, while the operator creates new cell database accounts.
+Nova services that started in that window, notably the super-conductor, cache
+connections that use the removed database users, so new instances scheduled to
+the affected cells hang in `BUILD`. Delete the Nova control plane service pods
+so they are recreated and re-read the reconciled mappings. The selector matches
+the API, scheduler, metadata, conductor and novncproxy pods; the API and
+scheduler pods are not part of a cell, so this restarts all of the Nova control
+plane services:
+
+```bash
+oc delete pod -n openstack \
+  -l 'service in (nova-api,nova-scheduler,nova-metadata,nova-conductor,nova-novncproxy)' \
+  --field-selector=status.phase=Running
+```
+
+Only `Running` pods are selected because the Nova DB purge CronJob pods share
+the `service=nova-conductor` label and remain `Completed`.
+
+Wait for the recreated pods to be `Ready` and for the control plane to be
+`Ready` again:
+
+```bash
+oc get pods -n openstack \
+  -l 'service in (nova-api,nova-scheduler,nova-metadata,nova-conductor,nova-novncproxy)'
+
+oc wait openstackcontrolplane -n openstack --for=condition=Ready --timeout=30m \
+  $(oc get openstackcontrolplane -n openstack -o jsonpath='{.items[0].metadata.name}')
+```
+
+The listing deliberately has no `Running` filter, so that replacement pods that
+are still `Pending` or not yet `Ready` stay visible. Every service, and every
+cell on multi-cell deployments, should show its expected number of `Ready`
+pods. Completed Nova DB purge pods may also be listed; ignore them.
 
 ### Step 7: Restore BaremetalHosts (Order 55, optional — baremetal-provisioned only)
 
@@ -678,6 +717,19 @@ oc get all,pvc,secret,configmap,nad -n openstack
 oc get openstackcontrolplane,openstackversion -n openstack
 ```
 
+After the restore is complete, boot a new instance in every available compute
+availability zone and verify that it reaches `ACTIVE`. This exercises scheduling
+and the cell database write path, which stopping and starting an existing
+instance does not. The ci-framework role does this automatically when the test
+workload is enabled (`cifmw_backup_restore_validate_az_boot`, default `true`).
+See [Additional Checks](../user-guide.md#additional-checks) in the user guide.
+
+Availability zones are used as a proxy for Nova cells, so this check exercises
+every cell only if each zone maps to exactly one cell. If several cells share a
+zone, only one of them is tested. The ci-framework role prints a warning when
+the `OpenStackControlPlane` defines more cells (excluding `cell0`) than there
+are availability zones.
+
 ## Troubleshooting
 
 ### Restore stuck or failed
@@ -699,6 +751,18 @@ oc get volumesnapshotcontent
 
 # Check PVC events
 oc describe pvc <pvc-name> -n openstack
+```
+
+### New instances stuck in BUILD after restore
+
+Existing instances work, but newly created instances stay in `BUILD`. The Nova
+super-conductor is most likely using cached cell database connections with
+credentials that no longer exist. Restart the Nova control plane service pods (Step 6c):
+
+```bash
+oc delete pod -n openstack \
+  -l 'service in (nova-api,nova-scheduler,nova-metadata,nova-conductor,nova-novncproxy)' \
+  --field-selector=status.phase=Running
 ```
 
 ### Database restore issues
