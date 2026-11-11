@@ -723,6 +723,54 @@ oc wait openstackcontrolplane -n openstack --all \
   --for=condition=Ready --timeout=30m
 ```
 
+#### Restart the Nova services
+
+The restored `nova_api.cell_mappings` table carries the cell database
+credentials from before the restore, while the operator creates new cell
+database accounts and removes the old ones. Nova services that start in that
+window (notably the super-conductor) cache connections that use the removed
+database users, and keep using them. Nothing restarts these services
+afterwards, so new instances scheduled to the affected cells hang in `BUILD`.
+Existing instances are not affected, so stopping and starting them does not
+reveal the problem.
+
+Delete the Nova control plane service pods so that they are recreated and
+re-read the reconciled cell mappings. The selector matches the API, scheduler,
+metadata, conductor and novncproxy pods; the API and scheduler pods are not
+part of a cell, so this restarts all of the Nova control plane services:
+
+```bash
+oc delete pod -n openstack \
+  -l 'service in (nova-api,nova-scheduler,nova-metadata,nova-conductor,nova-novncproxy)' \
+  --field-selector=status.phase=Running
+```
+
+`--field-selector=status.phase=Running` is required because the Nova DB purge
+CronJob pods also carry the `service=nova-conductor` label. They stay in the
+`Completed` phase and never become `Ready`, so they must be left alone.
+
+Wait until the pods have been recreated and are `Ready` again, then confirm the
+control plane is still `Ready`:
+
+```bash
+oc get pods -n openstack \
+  -l 'service in (nova-api,nova-scheduler,nova-metadata,nova-conductor,nova-novncproxy)'
+
+oc wait openstackcontrolplane -n openstack --all \
+  --for=condition=Ready --timeout=30m
+```
+
+The listing deliberately has no `Running` filter, so that replacement pods that
+are still `Pending` or not yet `Ready` stay visible. Every service, and every
+cell on multi-cell deployments, should show its expected number of `Ready`
+pods. Completed Nova DB purge pods (they carry the `service=nova-conductor`
+label) may also be listed; ignore them.
+
+On multi-cell deployments the selector covers the conductors, metadata and
+novncproxy pods of every cell. The ci-framework `cifmw_backup_restore` role
+performs this restart automatically (`cifmw_backup_restore_restart_nova`,
+enabled by default).
+
 ### Step 10: Verify and Sync Neutron to OVN
 
 If OVN database backups were not taken (Backup Steps 3 and 8 skipped), the OVN
@@ -1022,9 +1070,54 @@ oc get $(oc api-resources --verbs=list -o name | paste -sd, -) \
 Depending on your environment, consider running further validation:
 
 ```bash
-# Create a test instance to verify Nova, Neutron, Glance integration
-oc exec -t openstackclient -n openstack -- openstack server create --flavor m1.small \
-  --image cirros --network default test-post-restore
+# The ID of every test instance below is recorded so that only these instances
+# are cleaned up. --wait is not used on create: if a build fails, the command
+# exits without printing the ID, and the failed instance could not be cleaned up.
+ids=()
+
+# Create a test instance to verify Nova, Neutron, Glance integration. An ID is
+# only recorded if the create succeeded and printed one; otherwise it is reported.
+id=$(oc exec openstackclient -n openstack -- openstack server create --flavor m1.small \
+  --image cirros --network default -f value -c id test-post-restore) \
+  && [[ -n $id ]] && ids+=("$id") || echo "FAILED: could not create test-post-restore" >&2
+
+# Boot a test instance in every available compute availability zone. Stopping
+# and starting an existing instance does not exercise scheduling and the cell
+# database write path through the Nova super-conductor, so this is the check
+# that catches stale cell database connections (see "Restart the Nova services"
+# in Step 9). Use the image, flavor and network of your existing instances.
+# Availability zones are used as a proxy for Nova cells, so this exercises every
+# cell only if each zone maps to exactly one cell. If several cells share a zone,
+# only one of them is tested.
+zones=$(oc exec openstackclient -n openstack -- openstack availability zone list --compute \
+    -c "Zone Name" -c "Zone Status" -f value) || echo "FAILED: availability zone query failed" >&2
+azs=$(awk '$2=="available" && $1!="internal" {print $1}' <<< "$zones")
+[[ -n $azs ]] || echo "FAILED: no available compute availability zone found, no zone was tested" >&2
+for az in $azs; do
+  id=$(oc exec openstackclient -n openstack -- openstack server create --flavor m1.small \
+    --image cirros --network default --availability-zone "$az" \
+    -f value -c id test-post-restore-"$az") \
+    && [[ -n $id ]] && ids+=("$id") || echo "FAILED: could not create test-post-restore-$az" >&2
+done
+
+# Wait for each instance to leave BUILD (up to 5 minutes each). Every instance
+# must reach ACTIVE; one that stays in BUILD or goes to ERROR is a failure, and
+# its status and fault are printed here, before the cleanup below removes it.
+for id in "${ids[@]}"; do
+  for i in $(seq 60); do
+    status=$(oc exec openstackclient -n openstack -- openstack server show "$id" -f value -c status)
+    [[ $status == ACTIVE || $status == ERROR ]] && break
+    sleep 5
+  done
+  echo "$id: $status"
+  [[ $status == ACTIVE ]] || oc exec openstackclient -n openstack -- \
+    openstack server show "$id" -c status -c fault -f value
+done
+
+# Clean up only the instances created above, once all of them have been checked
+for id in "${ids[@]}"; do
+  oc exec openstackclient -n openstack -- openstack server delete --wait "$id"
+done
 
 # Verify existing instances can be managed (stop, start, migrate)
 oc exec -t openstackclient -n openstack -- openstack server list
