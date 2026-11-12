@@ -158,6 +158,35 @@ After building and pushing:
      -p '{"spec":{"approved":true}}'
    ```
 
+### Option: Deploy the upgrade path with install_yamls
+
+[install_yamls](https://github.com/openstack-k8s-operators/install_yamls)
+can drive the whole gated upgrade for you. Point it at a multi-version index
+and set `INSTALLPLAN_APPROVAL=Manual` plus `STARTING_CSV` so OLM installs the
+base version first and pauses before every upgrade until you approve it. The
+`openstack_approve_installplan` target approves the InstallPlan for a given CSV
+and waits for it to reach `Succeeded`.
+
+```bash
+# 1. Install with the gate: OLM stops at v19.0.0's InstallPlan, pending approval
+STARTING_CSV=openstack-operator.v19.0.0 \
+INSTALLPLAN_APPROVAL=Manual \
+OPENSTACK_IMG=quay.io/<namespace>/openstack-operator-index:v19.0.1 \
+PV_NUM=30 make openstack
+
+# 2. Approve the base version and wait until it Succeeds
+APPROVE_CSV=openstack-operator.v19.0.0 make openstack_approve_installplan
+
+# ... deploy/verify on the base version as needed, e.g.
+#     make openstack_init, make openstack_deploy, ...
+
+# 3. Approve the upgrade to the next version and wait until it Succeeds
+APPROVE_CSV=openstack-operator.v19.0.1 make openstack_approve_installplan
+```
+
+For an upgrade path with more than two versions, repeat step 3 with each
+successive CSV.
+
 ## Troubleshooting
 
 ### Upgrade not detected

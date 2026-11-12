@@ -23,6 +23,18 @@ Make sure nfs-server and firewalld are started:
 % systemctl start nfs-server
 ```
 
+### NFS in multi-node deployments
+
+If you are using RHOSO with several nodes, the nfs-server can be located on the
+host, but also on one of the nodes (e.g., the controller node). This might be
+more convenient since you can easily log in to the oc cluster from there.
+
+In this environment, the subnet that will handle the NFS connection will most
+likely differ from the one used in CRC. Use a network that all OCP nodes have
+access to. An example of this is the ctlplane network 192.168.122.0/24. You
+simply need to replace the subnet range from the command above with this one.
+The rest of the guide remains the same whether you use CRC or RHOSO.
+
 Tip
 ---
 CRC installs its own firewall rules, which likely will need to be adjusted
