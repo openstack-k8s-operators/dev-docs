@@ -17,6 +17,7 @@ Developer Documentation related to podified controlplane.
 * [Networking](networking.md)
 * [OVS Update](ovs-update.md)
 * [TLS](tls.md)
+* [Public endpoints on a LoadBalancer: custom hostname, port and certificate](public_endpoint_loadbalancer.md)
 * [Operator controller manager pod labels](operator_controller_labels.md)
 * [Testing operators with EnvTest](envtest.md)
 * [Test strategy](test_strategy.md)
