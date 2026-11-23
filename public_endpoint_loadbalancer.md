@@ -15,7 +15,7 @@ For the background of MetalLB, `NetConfig` and the `IPAddressPool` see [Networki
 ## Prerequisites
 
 1. **The public network on the OpenShift worker nodes.** The worker nodes that host the control plane must be connected to the network the public endpoint should be reachable on (a VLAN or interface with an address in that subnet). If the network is not yet configured on the nodes, add it with a `NodeNetworkConfigurationPolicy` (NNCP, NMstate operator) before anything else, see [Networking](networking.md#connect-ocp-workers-to-the-isolated-networks). MetalLB in layer 2 mode announces the IP only from nodes that have an interface on that network.
-2. **A MetalLB `IPAddressPool` and `L2Advertisement`** on that network (see [Networking](networking.md)). The examples use a pool called `public` and the IP `192.168.111.51`.
+2. **A MetalLB `IPAddressPool` and `L2Advertisement`** on that network (see [Networking](networking.md)). The examples use a pool called `public` and the IP `192.168.111.51`. A pool on a secondary network (not `br-ex`) requires OVN-Kubernetes local gateway mode (`routingViaHost: true`) and, for clients outside that subnet, additional routing on the nodes, see [Return routing](#return-routing-for-clients-outside-the-public-network).
 3. **A DNS name for every custom hostname.** The operator does **not** create DNS records for custom hostnames. Before (or right after) applying the configuration the hostname has to resolve to the LoadBalancer IP everywhere it is used, see [DNS](#dns-registering-the-hostnames).
 4. **A certificate that matches the hostname** if you bring your own, see [Certificates](#certificates).
 5. Service operators that are new enough to support this feature. A service whose operator is too old still gets the Service type, the certificate SANs and bring-your-own certificates, but may not serve the custom hostname or follow the `endpointURL` port. Check the release notes for the operator versions per service.
@@ -305,10 +305,99 @@ Service specific notes:
 ## Network and firewall requirements
 
 * Clients must reach the **LoadBalancer IP on the front port** (the port of the `endpointURL`, not the port of the pod) on the network of the MetalLB pool. Open that port in the firewalls between the clients and that network.
-* The MetalLB pool and its `L2Advertisement` must cover the network the clients are on; the IP must be unused elsewhere (see [Networking](networking.md)).
+* The MetalLB pool and its `L2Advertisement` must be on a network the clients can reach, directly or through its gateway; the IP must be unused elsewhere (see [Networking](networking.md)).
 * Pods and data plane nodes that use the public endpoint need the same route to the LoadBalancer IP.
 * Keep the internal LoadBalancer IPs unreachable from the public network with routing and firewall rules. This only controls who can reach the internal IPs; it does **not** restrict which virtual host is served on the public IP. Both endpoints are served by the same httpd and port and selected by the TLS server name (SNI), not by the IP the client connected to: a client that sends the internal name to the public IP reaches the internal virtual host, and a client without SNI always gets the internal virtual host. Routing and firewall rules cannot prevent this. Both virtual hosts proxy to the same service application and differ only in `ServerName` and certificate, so reaching the internal virtual host through the public IP gives no access beyond what the API's own authentication allows, and that authentication is what protects the API.
 * Services on one shared IP need distinct front ports (see [Several public services on one IP](#several-public-services-on-one-ip)).
+* If the MetalLB pool is on a secondary network and clients are not on that subnet, the worker nodes need additional routing for the replies, see [Return routing for clients outside the public network](#return-routing-for-clients-outside-the-public-network).
+
+### Return routing for clients outside the public network
+
+A worker node has one default route, normally via `br-ex`. MetalLB in layer 2 mode makes a node answer for the LoadBalancer IP on the public network's interface, so requests arrive there, but the replies to clients that are not on that subnet follow the default route and leave through `br-ex`. The path is asymmetric and the replies are dropped: clients outside the subnet time out, while clients on the public subnet itself work.
+
+This only applies when **all** of the following are true:
+
+* the MetalLB pool is on a secondary network (a VLAN or interface other than `br-ex`), e.g. the external network kept from RHOSP 17.1,
+* the gateway of that network is not the node's default gateway,
+* clients reach the LoadBalancer IP through that gateway, i.e. they are not on the public subnet.
+
+If the pool is on the `br-ex` network, or all clients are on the public subnet, nothing has to be done.
+
+MetalLB on a secondary network requires OVN-Kubernetes local gateway mode (`routingViaHost: true` in the cluster network configuration). Only in this mode does the node route the replies, so the routes below take effect.
+
+The routing is configured on the worker nodes with a `NodeNetworkConfigurationPolicy`, applied to **every** worker that has the public network interface, as the node announcing the IP changes on failover. Use the same `nodeSelector` as the policy that adds that interface (all workers in the examples); on a node without `ext` the routes cannot be applied. The examples in this section use the public network interface `ext` (`192.168.111.0/24`, gateway `192.168.111.1`).
+
+**Clients are a known set of networks.** Add a route per client network via the public network's gateway. This is the simplest option and does not depend on anything in the cluster:
+
+```yaml
+apiVersion: nmstate.io/v1
+kind: NodeNetworkConfigurationPolicy
+metadata:
+  name: public-endpoint-client-routes
+spec:
+  nodeSelector:
+    node-role.kubernetes.io/worker: ""   # the nodes that have the ext interface
+  desiredState:
+    routes:
+      config:
+      - destination: 203.0.113.0/24     # a client network
+        next-hop-address: 192.168.111.1
+        next-hop-interface: ext
+```
+
+These routes send all traffic to the listed networks through `ext`, not only the replies. Do not list networks that other workloads on the node must reach through `br-ex`.
+
+**Clients cannot be enumerated.** Use policy routing: a separate routing table with a default route via the public network, and a rule per public Service that sends its replies to that table. The rules match the **ClusterIP** of each public Service, not the LoadBalancer IP: the node makes the routing decision for the reply before the source is rewritten back to the LoadBalancer IP. List the Services and their ClusterIPs with:
+
+```bash
+oc get svc -n openstack \
+  -o custom-columns=NAME:.metadata.name,TYPE:.spec.type,CLUSTER-IP:.spec.clusterIP,LB-IP:.status.loadBalancer.ingress[0].ip \
+  | grep LoadBalancer
+```
+
+```yaml
+apiVersion: nmstate.io/v1
+kind: NodeNetworkConfigurationPolicy
+metadata:
+  name: public-endpoint-policy-routing
+spec:
+  nodeSelector:
+    node-role.kubernetes.io/worker: ""   # the nodes that have the ext interface
+  desiredState:
+    routes:
+      config:
+      - destination: 0.0.0.0/0          # table 620: default route via the public network
+        next-hop-address: 192.168.111.1
+        next-hop-interface: ext
+        table-id: 620
+    route-rules:
+      config:
+      # replies to the public subnet itself use the connected route (main table)
+      - ip-from: 172.30.0.0/16          # Service network (source of the replies)
+        ip-to: 192.168.111.0/24         # public subnet
+        route-table: 254
+        priority: 200
+      # defensive, pod to LoadBalancer IP traffic is handled inside OVN-Kubernetes
+      - ip-from: 172.30.0.0/16
+        ip-to: 10.128.0.0/14            # cluster (pod) network
+        route-table: 254
+        priority: 201
+      # everything else from a public Service goes to table 620, one rule per Service
+      - ip-from: 172.30.10.11/32        # keystone-public ClusterIP
+        route-table: 620
+        priority: 210
+      - ip-from: 172.30.10.12/32        # placement-public ClusterIP
+        route-table: 620
+        priority: 210
+```
+
+Add a rule for every public Service on the pool, also when several Services share one LoadBalancer IP. A ClusterIP stays the same for the life of its Service, but a Service that is deleted and recreated, or a service enabled later, gets a new one; update the rules then. The Service network (`172.30.0.0/16`) and the pod network (`10.128.0.0/14`) in the rules are the OpenShift defaults; substitute the values of your cluster, read with `oc get network.config.openshift.io cluster -o jsonpath='{.spec.serviceNetwork[*]} {.spec.clusterNetwork[*].cidr}'`.
+
+Do not add rules that keep replies to other networks (for example the `br-ex` network) on the main table: clients on those networks also reach the LoadBalancer IP through the public network's gateway, and their replies have to return that way.
+
+This policy routing was validated on OpenShift 4.22 with OVN-Kubernetes in local gateway mode. To check it on the announcing node, run `oc debug node/<node>` and `chroot /host`: `ip rule` lists the rules and `ip route show table 620` shows the default route via the public network.
+
+MetalLB in BGP mode with the public network in its own VRF avoids the policy routing above; the replies then use the routing table of the VRF. VRFs are not available in layer 2 mode, and the VRF setup can be Technology Preview in some OpenShift releases, check its support status in the OpenShift documentation for your release.
 
 ## Procedure: new deployment
 
@@ -317,14 +406,15 @@ Service specific notes:
 3. Decide on the certificate: default (operator-issued), custom issuer, or your own secret, see [Certificates](#certificates). Prepare the secret and the CA bundle if needed.
 4. In the `OpenStackControlPlane` set the public Service to `type: LoadBalancer` with the MetalLB annotations and set `endpointURL` (hostname and port), plus `tls.api.public.secretName` for your own certificate.
 5. Apply and wait for the control plane to be ready.
-6. Verify, see [Verification](#verification): the Service has the IP and front port, the catalog shows the `endpointURL`, and the certificate presented for the hostname is the expected one and is trusted.
+6. If the MetalLB pool is on a secondary network and clients are outside its subnet, configure the [return routing](#return-routing-for-clients-outside-the-public-network). The policy routing option needs the ClusterIPs of the public Services, which exist once the control plane (step 5) has created the Services.
+7. Verify, see [Verification](#verification): the Service has the IP and front port, the catalog shows the `endpointURL`, and the certificate presented for the hostname is the expected one and is trusted.
 
 ## Procedure: adoption from RHOSP 17.1
 
 Goal: keep the VIP, hostnames, TLS ports and certificate of the 17.1 public endpoints.
 
 1. Collect from the 17.1 deployment per service: the public VIP, the hostname clients use, the TLS port (the director ports in the [table above](#several-public-services-on-one-ip) unless changed), and the certificate, key and CA.
-2. Free the VIP on the 17.1 side and provide it as MetalLB address (`loadBalancerIPs`) on the external network. Moving the VIP, and the firewall and routing changes, are manual and not covered here.
+2. Free the VIP on the 17.1 side and provide it as MetalLB address (`loadBalancerIPs`) on the external network. Moving the VIP and the firewall changes are manual and not covered here. If the external network is not the `br-ex` network, the worker nodes need the [return routing](#return-routing-for-clients-outside-the-public-network); with the policy routing option configure it after step 5, once the public Services and their ClusterIPs exist.
 3. DNS: the existing records for the hostnames keep pointing to the VIP; check that the cluster upstream resolver and the dnsmasq upstream resolve them, see [DNS](#dns-registering-the-hostnames).
 4. Create the secret with the existing certificate per endpoint (`tls.crt`, `tls.key`, `ca.crt`) and add the CA to `caBundleSecretName`. The certificate has to contain the hostname as SAN.
 5. For each service configure the public Service as `LoadBalancer` on the VIP, `endpointURL: https://<hostname>:<17.1 port>` and `tls.api.public.secretName`. Services sharing the VIP keep working side by side as their 17.1 ports differ. To use another port than the 17.1 one, set it in the `endpointURL`.
@@ -345,6 +435,8 @@ oc rsh openstackclient getent hosts keystone.example.com
 # the certificate is trusted by the CA you expect
 openssl s_client -connect 192.168.111.51:13000 -servername keystone.example.com \
   -CAfile company-ca.crt </dev/null 2>&1 | grep 'Verify return code'
+# from a client outside the public subnet (needs the return routing on a secondary network)
+curl -sv --cacert company-ca.crt https://keystone.example.com:13000/ -o /dev/null
 # custom certificate state
 oc get openstackcontrolplane -n openstack -o yaml | grep -A3 CustomTLSReady
 ```
@@ -372,6 +464,7 @@ Not rejected, but a common mistake: `endpointURL` on an endpoint whose Service i
 | `Verify return code` is not 0 / client says unknown CA | The CA of the certificate is not in the client's trust store, or not in `caBundleSecretName` for OpenStack services and EDPM nodes. |
 | Hostname mismatch, certificate lacks the custom name | Bring-your-own certificate has no SAN for the host; or issuance is not finished, check `oc get certificate -n openstack`. |
 | Connection refused / timeout on the custom port | Listener port differs from the URL (old service operator), or no route/firewall to the LB IP; check `oc get svc`. |
+| Timeout only from clients outside the public subnet; clients on the subnet work | Replies leave through the node's default route, see [Return routing](#return-routing-for-clients-outside-the-public-network). |
 | Name does not resolve (from a pod, a node or a client) | Hostname not registered in all resolvers, see [DNS](#dns-registering-the-hostnames). |
 | Two public Services stay `<pending>` on one IP | Same IP and same port; use explicit, distinct ports in the `endpointURL`s. |
 | `CustomTLSReadyCondition` is False | The secret from `tls.api.*.secretName` is missing (retried every 10s) or invalid. |
